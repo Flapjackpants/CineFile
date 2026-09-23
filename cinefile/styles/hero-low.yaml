@@ -1,0 +1,10 @@
+id: hero-low
+description: Low camera looking up for scale on tall builds.
+distance: 7.5
+height: -0.8
+lateral: 2.0
+pitch: 12.0
+yaw_lock: true
+orbit_degrees: 0.0
+dolly_scale: 0.8
+thirds_side: auto

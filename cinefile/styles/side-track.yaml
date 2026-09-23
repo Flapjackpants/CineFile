@@ -1,0 +1,10 @@
+id: side-track
+description: Strong lateral thirds framing, parallel tracking.
+distance: 5.5
+height: 1.2
+lateral: 3.5
+pitch: -2.0
+yaw_lock: true
+orbit_degrees: 0.0
+dolly_scale: 1.0
+thirds_side: left

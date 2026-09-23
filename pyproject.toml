@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cinefile"
+version = "0.1.0"
+description = "Automated Flashback cinematography CLI (Jev + DeepSeek Flash)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "requests>=2.31",
+  "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+cinefile = "cinefile.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["cinefile*"]
+
+[tool.setuptools.package-data]
+cinefile = ["styles/*.yaml"]

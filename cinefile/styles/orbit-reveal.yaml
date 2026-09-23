@@ -1,0 +1,10 @@
+id: orbit-reveal
+description: Gentle yaw arc across the two keyframes around the subject.
+distance: 8.0
+height: 2.0
+lateral: 0.5
+pitch: -8.0
+yaw_lock: false
+orbit_degrees: 35.0
+dolly_scale: 0.6
+thirds_side: auto

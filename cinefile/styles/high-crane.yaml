@@ -1,0 +1,10 @@
+id: high-crane
+description: Elevated overview of large projects.
+distance: 12.0
+height: 6.0
+lateral: 2.5
+pitch: -25.0
+yaw_lock: true
+orbit_degrees: 0.0
+dolly_scale: 1.2
+thirds_side: auto
