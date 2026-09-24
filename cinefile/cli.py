@@ -31,6 +31,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to Flashback replay .zip (omit to open the interactive TUI)",
     )
     p.add_argument(
+        "-i",
+        "--input",
+        type=Path,
+        default=None,
+        help="Prefill the input path in Settings and open the Settings page",
+    )
+    p.add_argument(
+        "-o",
+        "--output",
+        type=Path,
+        default=None,
+        help="Prefill the output path in Settings and open the Settings page",
+    )
+    p.add_argument(
         "--clip-length",
         type=float,
         default=None,
@@ -159,7 +173,19 @@ def main(argv: list[str] | None = None) -> int:
         from .tui import CineFileApp
 
         editor_dir = normalize_editor_dir(args.editor_dir) if args.editor_dir else None
-        return CineFileApp(run_options=run_overrides, editor_dir=editor_dir).run()
+        settings_overrides = {
+            key: str(value)
+            for key, value in {
+                "input_path": args.input,
+                "output_path": args.output,
+            }.items()
+            if value is not None
+        }
+        return CineFileApp(
+            run_options=run_overrides,
+            editor_dir=editor_dir,
+            settings_overrides=settings_overrides,
+        ).run()
 
     if not args.replay.exists():
         print(f"error: replay not found: {args.replay}", file=sys.stderr)

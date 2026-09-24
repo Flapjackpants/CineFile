@@ -7,9 +7,10 @@ def test_no_replay_launches_textual_tui(monkeypatch):
     received = {}
 
     class FakeApp:
-        def __init__(self, *, run_options, editor_dir):
+        def __init__(self, *, run_options, editor_dir, settings_overrides):
             received["options"] = run_options
             received["editor_dir"] = editor_dir
+            received["settings_overrides"] = settings_overrides
 
         def run(self):
             return 7
@@ -19,15 +20,17 @@ def test_no_replay_launches_textual_tui(monkeypatch):
     assert cli.main([]) == 7
     assert received["options"] == {}
     assert received["editor_dir"] is None
+    assert received["settings_overrides"] == {}
 
 
 def test_no_replay_cli_flags_override_saved_settings(monkeypatch):
     received = {}
 
     class FakeApp:
-        def __init__(self, *, run_options, editor_dir):
+        def __init__(self, *, run_options, editor_dir, settings_overrides):
             received["options"] = run_options
             received["editor_dir"] = editor_dir
+            received["settings_overrides"] = settings_overrides
 
         def run(self):
             return 0
@@ -36,6 +39,47 @@ def test_no_replay_cli_flags_override_saved_settings(monkeypatch):
     monkeypatch.setattr("cinefile.tui.CineFileApp", FakeApp, raising=False)
     assert cli.main(["--clip-length", "15", "--offline"]) == 0
     assert received["options"] == {"clip_length_s": 15.0, "offline": True}
+    assert received["settings_overrides"] == {}
+
+
+def test_input_and_output_path_flags_are_passed_to_tui(monkeypatch, tmp_path: Path):
+    received = {}
+
+    class FakeApp:
+        def __init__(self, *, run_options, editor_dir, settings_overrides):
+            received["settings_overrides"] = settings_overrides
+
+        def run(self):
+            return 0
+
+    monkeypatch.setattr("cinefile.tui.CineFileApp", FakeApp, raising=False)
+    input_path = tmp_path / "replays"
+    output_path = tmp_path / "flashback"
+    assert cli.main(["-i", str(input_path), "--output", str(output_path)]) == 0
+    assert received["settings_overrides"] == {
+        "input_path": str(input_path),
+        "output_path": str(output_path),
+    }
+
+
+def test_long_input_and_short_output_path_flags_are_passed_to_tui(monkeypatch, tmp_path: Path):
+    received = {}
+
+    class FakeApp:
+        def __init__(self, *, run_options, editor_dir, settings_overrides):
+            received["settings_overrides"] = settings_overrides
+
+        def run(self):
+            return 0
+
+    monkeypatch.setattr("cinefile.tui.CineFileApp", FakeApp, raising=False)
+    input_path = tmp_path / "replays"
+    output_path = tmp_path / "flashback"
+    assert cli.main(["--input", str(input_path), "-o", str(output_path)]) == 0
+    assert received["settings_overrides"] == {
+        "input_path": str(input_path),
+        "output_path": str(output_path),
+    }
 
 
 def test_direct_replay_cli_keeps_pipeline_path(monkeypatch, tmp_path: Path):

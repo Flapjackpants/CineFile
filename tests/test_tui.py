@@ -31,6 +31,39 @@ def test_replay_browser_lists_zips_and_has_no_buttons(tmp_path: Path):
     asyncio.run(check())
 
 
+def test_cli_path_overrides_open_settings_and_save_with_saved_fallback(monkeypatch, tmp_path: Path):
+    from cinefile import tui
+
+    saved_settings = Settings(
+        input_path=str(tmp_path / "saved-replays"),
+        output_path=str(tmp_path / "saved-flashback"),
+    )
+    saved = []
+    monkeypatch.setattr(tui, "load_settings", lambda: saved_settings)
+    monkeypatch.setattr(tui, "save_settings", lambda settings: saved.append(settings))
+    input_path = tmp_path / "cli-replays"
+    app = CineFileApp(settings_overrides={"input_path": str(input_path)})
+
+    async def check():
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            assert isinstance(app.screen, SettingsScreen)
+            assert saved == []
+            editor = app.screen.query_one("#editor", VimBuffer)
+            data = json.loads(editor.get_text())
+            assert data["input_path"] == str(input_path)
+            assert data["output_path"] == saved_settings.output_path
+
+            app.screen.on_vim_buffer_command_submitted(VimBuffer.CommandSubmitted("wq"))
+            await pilot.pause()
+            assert isinstance(app.screen, ReplayScreen)
+            assert len(saved) == 1
+            assert saved[0].input_path == str(input_path.resolve())
+            assert saved[0].output_path == str((tmp_path / "saved-flashback").resolve())
+
+    asyncio.run(check())
+
+
 def test_settings_json_editor_saves_and_closes(monkeypatch, tmp_path: Path):
     from cinefile import tui
 

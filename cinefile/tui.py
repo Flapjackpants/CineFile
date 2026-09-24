@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -64,15 +65,19 @@ class CineFileApp(App[int]):
         *,
         run_options: dict[str, Any] | None = None,
         editor_dir: Path | None = None,
+        settings_overrides: dict[str, str] | None = None,
     ) -> None:
         super().__init__()
-        self.settings = load_settings()
+        self.settings_overrides = settings_overrides or {}
+        self.settings = replace(load_settings(), **self.settings_overrides)
         # Explicit CLI options override saved defaults for this TUI session.
         self.run_options = run_options or {}
         self.editor_dir = editor_dir
 
     def on_mount(self) -> None:
         self.push_screen(ReplayScreen())
+        if self.settings_overrides:
+            self.push_screen(SettingsScreen())
 
 
 class ShellScreen(Screen[None]):
