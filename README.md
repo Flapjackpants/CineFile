@@ -17,14 +17,16 @@ python3 -m pip install -e .
 cinefile
 ```
 
-Opens a numbered menu. Under **Settings**, set:
+Opens the interactive terminal UI. Under **Settings**, set:
 
 - **Input path** — folder of Flashback replay `.zip` files (e.g. `…/flashback/replays`, or `…/flashback`)
 - **Output path** — where editor states are written (e.g. `…/flashback`, or `…/flashback/editor_states`)
 
 Paths are saved to `~/.config/cinefile/settings.json` (or `$XDG_CONFIG_HOME/cinefile/settings.json`).
 
-Then choose **Create flashback edits** to pick a replay from the input folder.
+Choose a replay, adjust run options, and select **Generate edits**. Use the
+keyboard shortcuts shown in the footer to navigate. The title banner area is
+reserved for custom ASCII art and remains blank until supplied.
 
 ### Flags (scripting)
 

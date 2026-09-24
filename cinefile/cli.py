@@ -8,7 +8,6 @@ from pathlib import Path
 
 from . import __version__
 from .editor import normalize_editor_dir
-from .menu import run_menu
 from .pipeline import run
 from .settings import load_settings
 from .styles_loader import list_styles, styles_as_dict
@@ -21,7 +20,7 @@ def build_parser() -> argparse.ArgumentParser:
         description=(
             "Automate Flashback cinematic camera + optional 1s timelapse gaps. "
             "Writes editor_states/{uuid}.json — reopen the replay in Flashback to load. "
-            "Run with no arguments for an interactive menu."
+            "Run with no arguments for the interactive TUI."
         ),
     )
     p.add_argument("--version", action="version", version=f"cinefile {__version__}")
@@ -29,7 +28,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--replay",
         type=Path,
         default=None,
-        help="Path to Flashback replay .zip (omit to open interactive menu)",
+        help="Path to Flashback replay .zip (omit to open the interactive TUI)",
     )
     p.add_argument(
         "--clip-length",
@@ -129,10 +128,6 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{sid}: {desc}")
         return 0
 
-    # No args → interactive menu
-    if not argv:
-        return run_menu()
-
     parser = build_parser()
     args = parser.parse_args(argv)
 
@@ -148,9 +143,12 @@ def main(argv: list[str] | None = None) -> int:
         "dry_run": args.dry_run,
     }
 
-    # Flags without --replay → menu, carrying flag defaults
+    # Without a replay, open the TUI and prefill its controls from CLI options.
     if args.replay is None:
-        return run_menu(run_kwargs=run_kwargs)
+        from .tui import CineFileApp
+
+        editor_dir = normalize_editor_dir(args.editor_dir) if args.editor_dir else None
+        return CineFileApp(run_options=run_kwargs, editor_dir=editor_dir).run()
 
     if not args.replay.exists():
         print(f"error: replay not found: {args.replay}", file=sys.stderr)
