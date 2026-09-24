@@ -33,29 +33,30 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--clip-length",
         type=float,
-        default=10.0,
-        help="Length of each cinematic shot in seconds (default: 10)",
+        default=None,
+        help="Length of each cinematic shot in seconds (default: saved setting, initially 10)",
     )
     p.add_argument(
         "--style",
         choices=styles,
-        default="locked-dolly",
+        default=None,
         help="Pre-made camera style preset",
     )
     p.add_argument(
         "--duration",
         type=float,
-        default=180.0,
-        help="Target total cinematic duration in seconds (sum of clips)",
+        default=None,
+        help="Target total cinematic duration in seconds (default: saved setting, initially 180)",
     )
     p.add_argument(
         "--project",
-        default="",
+        default=None,
         help="Optional description to guide representative clip picking",
     )
     p.add_argument(
         "--timelapse",
         action="store_true",
+        default=None,
         help="Fill gaps between clips with 1-second (0→20 tick) timelapse tracks",
     )
     p.add_argument(
@@ -67,22 +68,25 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--offline",
         action="store_true",
+        default=None,
         help="Skip DeepSeek/Jev; use heuristic selection only",
     )
     p.add_argument(
         "--max-ai-usd",
         type=float,
-        default=0.05,
+        default=None,
         help="Abort further AI calls once estimated spend exceeds this (default 0.05)",
     )
     p.add_argument(
         "--think",
         action="store_true",
+        default=None,
         help="Allow higher DeepSeek reasoning effort (costs more)",
     )
     p.add_argument(
         "--dry-run",
         action="store_true",
+        default=None,
         help="Write *.json.dry_run instead of replacing editor state",
     )
     p.add_argument(
@@ -131,24 +135,31 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    run_kwargs = {
-        "clip_length_s": args.clip_length,
-        "style_id": args.style,
-        "duration_s": args.duration,
-        "project": args.project,
-        "timelapse": args.timelapse,
-        "offline": args.offline,
-        "max_ai_usd": args.max_ai_usd,
-        "think": args.think,
-        "dry_run": args.dry_run,
+    settings = load_settings()
+    run_defaults = settings.run_options()
+    run_overrides = {
+        key: value
+        for key, value in {
+            "clip_length_s": args.clip_length,
+            "style_id": args.style,
+            "duration_s": args.duration,
+            "project": args.project,
+            "timelapse": args.timelapse,
+            "offline": args.offline,
+            "max_ai_usd": args.max_ai_usd,
+            "think": args.think,
+            "dry_run": args.dry_run,
+        }.items()
+        if value is not None
     }
+    run_kwargs = {**run_defaults, **run_overrides}
 
-    # Without a replay, open the TUI and prefill its controls from CLI options.
+    # Without a replay, open the TUI and use explicit CLI options as session overrides.
     if args.replay is None:
         from .tui import CineFileApp
 
         editor_dir = normalize_editor_dir(args.editor_dir) if args.editor_dir else None
-        return CineFileApp(run_options=run_kwargs, editor_dir=editor_dir).run()
+        return CineFileApp(run_options=run_overrides, editor_dir=editor_dir).run()
 
     if not args.replay.exists():
         print(f"error: replay not found: {args.replay}", file=sys.stderr)
@@ -166,7 +177,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
-    _print_result(result, args.style, args.offline)
+    _print_result(result, run_kwargs["style_id"], run_kwargs["offline"])
     return 0
 
 

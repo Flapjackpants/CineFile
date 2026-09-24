@@ -8,6 +8,7 @@ from cinefile.settings import (
     normalize_input_dir,
     normalize_output_dir,
     save_settings,
+    settings_from_dict,
 )
 
 
@@ -18,12 +19,43 @@ def test_settings_roundtrip(tmp_path: Path):
     loaded = load_settings(cfg)
     assert loaded.input_path == "/tmp/in"
     assert loaded.output_path == "/tmp/out"
+    assert loaded.clip_length_s == 10.0
+    assert loaded.style_id == "locked-dolly"
 
 
 def test_settings_missing_file(tmp_path: Path):
     loaded = load_settings(tmp_path / "missing.json")
     assert loaded.input_path is None
     assert loaded.output_path is None
+
+
+def test_legacy_path_only_settings_load_with_generation_defaults(tmp_path: Path):
+    cfg = tmp_path / "settings.json"
+    cfg.write_text('{"input_path": "/tmp/replays", "output_path": "/tmp/flashback"}')
+    loaded = load_settings(cfg)
+    assert loaded.input_path == "/tmp/replays"
+    assert loaded.output_path == "/tmp/flashback"
+    assert loaded.run_options() == {
+        "clip_length_s": 10.0,
+        "style_id": "locked-dolly",
+        "duration_s": 180.0,
+        "project": "",
+        "timelapse": False,
+        "offline": False,
+        "max_ai_usd": 0.05,
+        "think": False,
+        "dry_run": False,
+    }
+
+
+def test_settings_reject_invalid_values():
+    for field, value in (("clip_length_s", 0), ("duration_s", float("inf")), ("max_ai_usd", -1), ("timelapse", "yes"), ("style_id", "unknown")):
+        try:
+            settings_from_dict({field: value})
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"accepted invalid {field}={value!r}")
 
 
 def test_normalize_output_editor_states(tmp_path: Path):

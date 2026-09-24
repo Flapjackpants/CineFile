@@ -3,52 +3,28 @@
 from __future__ import annotations
 
 import asyncio
-import math
+import json
 from pathlib import Path
 from typing import Any
 
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Grid, Horizontal, Vertical, VerticalScroll
+from textual.containers import Vertical
 from textual.screen import Screen
 from textual.widgets import (
-    Button,
-    Checkbox,
     DataTable,
     Footer,
     Header,
-    Input,
     Label,
-    Select,
     Static,
 )
 
 from .menu import list_replay_zips
 from .pipeline import RunResult, run
 from .editor import normalize_editor_dir
-from .settings import (
-    Settings,
-    expand_user_path,
-    load_settings,
-    normalize_input_dir,
-    normalize_output_dir,
-    save_settings,
-)
-from .styles_loader import list_styles
-
-
-DEFAULT_RUN_OPTIONS: dict[str, Any] = {
-    "clip_length_s": 10.0,
-    "style_id": "locked-dolly",
-    "duration_s": 180.0,
-    "project": "",
-    "timelapse": False,
-    "offline": False,
-    "max_ai_usd": 0.05,
-    "think": False,
-    "dry_run": False,
-}
+from .settings import Settings, load_settings, normalize_input_dir, normalize_output_dir, save_settings, settings_from_dict
+from .vim_buffer import VimBuffer
 
 
 class CineFileApp(App[int]):
@@ -70,22 +46,10 @@ class CineFileApp(App[int]):
         padding: 0 2;
         color: $text-muted;
     }
-    #button-row { height: auto; align-horizontal: right; }
-    #button-row Button { margin-left: 1; }
-    .form-row { height: auto; margin-bottom: 1; }
-    .form-row Label { width: 24; padding-top: 1; }
-    .form-row Input, .form-row Select { width: 1fr; }
-    .check-row { height: 1; width: 1fr; }
-    #option-grid {
-        grid-size: 2 3;
-        grid-columns: 1fr 1fr;
-        grid-gutter: 0 2;
-        height: auto;
-    }
-    .option-field { height: 4; }
-    .option-field Label { height: 1; }
-    .option-field Input, .option-field Select { height: 3; }
-    #message { height: auto; margin: 1 0; }
+    #editor-wrap { height: 1fr; padding: 0 1; }
+    #editor-wrap VimBuffer { height: 1fr; }
+    #mode-bar { height: 1; padding: 0 2; color: $text-muted; }
+    #showcmd { height: 1; padding: 0 2; content-align: right middle; color: $text-muted; }
     #result-box {
         width: 80%;
         height: auto;
@@ -103,7 +67,8 @@ class CineFileApp(App[int]):
     ) -> None:
         super().__init__()
         self.settings = load_settings()
-        self.run_options = {**DEFAULT_RUN_OPTIONS, **(run_options or {})}
+        # Explicit CLI options override saved defaults for this TUI session.
+        self.run_options = run_options or {}
         self.editor_dir = editor_dir
 
     def on_mount(self) -> None:
@@ -116,8 +81,8 @@ class ShellScreen(Screen[None]):
 
 class ReplayScreen(ShellScreen):
     BINDINGS = [
-        Binding("enter", "configure", "Configure run"),
-        Binding("r", "configure", "Run options"),
+        Binding("enter", "run_selected", "Run selected"),
+        Binding("r", "run_selected", "Run selected"),
         Binding("s", "settings", "Settings"),
         Binding("q", "quit", "Quit"),
     ]
@@ -129,10 +94,7 @@ class ReplayScreen(ShellScreen):
             with Vertical(id="content"):
                 yield Label("Select a Flashback replay")
                 yield DataTable(id="replay-table", cursor_type="row", zebra_stripes=True)
-                with Horizontal(id="button-row"):
-                    yield Button("Run options", id="configure", variant="primary")
-                    yield Button("Settings", id="settings")
-                    yield Button("Quit", id="quit")
+                yield Label("↑/↓ select  Enter or r run  s settings  q quit")
             yield Static("", id="status-bar")
             yield Footer()
 
@@ -179,194 +141,90 @@ class ReplayScreen(ShellScreen):
         except Exception:
             return None
 
-    def action_configure(self) -> None:
+    def action_run_selected(self) -> None:
         replay = self.selected_replay()
         if replay is None:
             self.notify("Select a replay first.", severity="warning")
             return
-        self.app.push_screen(RunOptionsScreen(replay))
+        settings = self.app.settings
+        options = {**settings.run_options(), **self.app.run_options}
+        result_screen = ResultScreen(replay, running=True)
+        self.app.push_screen(result_screen)
+        self._start_run(replay, options, result_screen)
 
     def action_settings(self) -> None:
         self.app.push_screen(SettingsScreen())
 
-    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
-        self.action_configure()
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "configure":
-            self.action_configure()
-        elif event.button.id == "settings":
-            self.action_settings()
-        elif event.button.id == "quit":
-            self.app.exit(0)
-
-    def on_screen_resume(self) -> None:
-        self.refresh_replays()
-
-
-class SettingsScreen(ShellScreen):
-    BINDINGS = [Binding("escape", "cancel", "Back")]
-
-    def compose(self) -> ComposeResult:
-        settings = self.app.settings
-        with Vertical():
-            yield Header(show_clock=True)
-            yield Static("", id="title-art")
-            with VerticalScroll(id="content"):
-                yield Label("Settings")
-                with Horizontal(classes="form-row"):
-                    yield Label("Replay input folder")
-                    yield Input(settings.input_path or "", id="input-path", placeholder="~/.../flashback/replays")
-                with Horizontal(classes="form-row"):
-                    yield Label("Flashback output folder")
-                    yield Input(settings.output_path or "", id="output-path", placeholder="~/.../flashback")
-                yield Static("Paths are saved in ~/.config/cinefile/settings.json.", id="message")
-                with Horizontal(id="button-row"):
-                    yield Button("Save", id="save", variant="primary")
-                    yield Button("Cancel", id="cancel")
-            yield Static("", id="status-bar")
-            yield Footer()
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "cancel":
-            self.app.pop_screen()
-            return
-        if event.button.id != "save":
-            return
-        input_raw = self.query_one("#input-path", Input).value.strip()
-        output_raw = self.query_one("#output-path", Input).value.strip()
-        try:
-            input_path = str(normalize_input_dir(expand_user_path(input_raw))) if input_raw else None
-            output_path = str(normalize_output_dir(expand_user_path(output_raw))) if output_raw else None
-        except OSError as exc:
-            self.notify(f"Invalid path: {exc}", severity="error")
-            return
-        settings = Settings(input_path=input_path, output_path=output_path)
-        try:
-            save_settings(settings)
-        except OSError as exc:
-            self.notify(f"Could not save settings: {exc}", severity="error")
-            return
-        self.app.settings = settings
-        self.notify("Settings saved.")
-        self.app.pop_screen()
-
-    def action_cancel(self) -> None:
-        self.app.pop_screen()
-
-
-class RunOptionsScreen(ShellScreen):
-    BINDINGS = [Binding("escape", "cancel", "Back")]
-
-    def __init__(self, replay: Path) -> None:
-        super().__init__()
-        self.replay = replay
-
-    def compose(self) -> ComposeResult:
-        opts = self.app.run_options
-        with Vertical():
-            yield Header(show_clock=True)
-            yield Static("", id="title-art")
-            with VerticalScroll(id="content"):
-                yield Label(f"Run options — {self.replay.name}")
-                with Grid(id="option-grid"):
-                    with Vertical(classes="option-field"):
-                        yield Label("Clip length (seconds)")
-                        yield Input(str(opts["clip_length_s"]), id="clip-length", type="number")
-                    with Vertical(classes="option-field"):
-                        yield Label("Camera style")
-                        yield Select(
-                            [(style, style) for style in list_styles()],
-                            value=opts["style_id"],
-                            id="style",
-                            allow_blank=False,
-                        )
-                    with Vertical(classes="option-field"):
-                        yield Label("Target duration (seconds)")
-                        yield Input(str(opts["duration_s"]), id="duration", type="number")
-                    with Vertical(classes="option-field"):
-                        yield Label("Project description")
-                        yield Input(str(opts["project"]), id="project")
-                    with Vertical(classes="option-field"):
-                        yield Label("Maximum AI spend (USD)")
-                        yield Input(str(opts["max_ai_usd"]), id="max-ai-usd", type="number")
-                with Horizontal():
-                    yield Checkbox("Fill gaps with timelapse", value=opts["timelapse"], id="timelapse", classes="check-row")
-                    yield Checkbox("Offline / heuristic selection", value=opts["offline"], id="offline", classes="check-row")
-                with Horizontal():
-                    yield Checkbox("Allow higher reasoning effort", value=opts["think"], id="think", classes="check-row")
-                    yield Checkbox("Dry run (.dry_run file)", value=opts["dry_run"], id="dry-run", classes="check-row")
-                with Horizontal(id="button-row"):
-                    yield Button("Generate edits", id="run", variant="primary")
-                    yield Button("Cancel", id="cancel")
-            yield Static("", id="status-bar")
-            yield Footer()
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "cancel":
-            self.app.pop_screen()
-            return
-        if event.button.id != "run":
-            return
-        try:
-            clip_length = float(self.query_one("#clip-length", Input).value)
-            duration = float(self.query_one("#duration", Input).value)
-            max_ai_usd = float(self.query_one("#max-ai-usd", Input).value)
-            if (
-                not math.isfinite(clip_length)
-                or not math.isfinite(duration)
-                or not math.isfinite(max_ai_usd)
-                or clip_length <= 0
-                or duration <= 0
-                or max_ai_usd < 0
-            ):
-                raise ValueError
-        except ValueError:
-            self.notify("Clip length and duration must be positive; AI spend must be nonnegative.", severity="error")
-            return
-        options = {
-            "clip_length_s": clip_length,
-            "style_id": self.query_one("#style", Select).value,
-            "duration_s": duration,
-            "project": self.query_one("#project", Input).value,
-            "timelapse": self.query_one("#timelapse", Checkbox).value,
-            "offline": self.query_one("#offline", Checkbox).value,
-            "max_ai_usd": max_ai_usd,
-            "think": self.query_one("#think", Checkbox).value,
-            "dry_run": self.query_one("#dry-run", Checkbox).value,
-        }
-        self.app.run_options = options
-        result_screen = ResultScreen(self.replay, running=True)
-        self.app.push_screen(result_screen)
-        self._start_run(options, result_screen)
-
     @work(exclusive=True)
-    async def _start_run(self, options: dict[str, Any], result_screen: "ResultScreen") -> None:
+    async def _start_run(self, replay: Path, options: dict[str, Any], result_screen: "ResultScreen") -> None:
+        output_path = self.app.settings.output_path
+        editor_dir = self.app.editor_dir
+        if editor_dir is None and output_path:
+            editor_dir = normalize_editor_dir(Path(output_path).expanduser())
         try:
-            result = await asyncio.to_thread(
-                run,
-                self.replay,
-                editor_dir=self.app.editor_dir or self._settings_editor_dir(),
-                **options,
-            )
+            result = await asyncio.to_thread(run, replay, editor_dir=editor_dir, **options)
             await asyncio.sleep(0.01)
             result_screen.show_result(result=result, style=options["style_id"])
         except Exception as exc:
             await asyncio.sleep(0.01)
             result_screen.show_result(error=str(exc))
 
-    def _settings_editor_dir(self) -> Path | None:
-        output_path = self.app.settings.output_path
-        if not output_path:
-            return None
-        return normalize_editor_dir(Path(output_path).expanduser())
+    def on_screen_resume(self) -> None:
+        self.refresh_replays()
 
-    def action_cancel(self) -> None:
-        self.app.pop_screen()
+
+class SettingsScreen(ShellScreen):
+    BINDINGS = []
+
+    def _initial_text(self) -> str:
+        return json.dumps(vars(self.app.settings), indent=2) + "\n"
+
+    def compose(self) -> ComposeResult:
+        with Vertical():
+            yield Header(show_clock=True)
+            yield Static("", id="title-art")
+            yield Label("Settings — edit JSON; i insert, Escape normal, :w save, :wq save/back, :q discard")
+            with Vertical(id="editor-wrap"):
+                yield VimBuffer(self._initial_text(), id="editor")
+            yield Static("-- NORMAL --", id="mode-bar")
+            yield Static("", id="showcmd")
+            yield Footer()
+
+    def on_mount(self) -> None:
+        self.query_one("#editor", VimBuffer).focus()
+
+    def on_vim_buffer_mode_changed(self, event: VimBuffer.ModeChanged) -> None:
+        self.query_one("#mode-bar", Static).update(event.status)
+
+    def on_vim_buffer_command_submitted(self, event: VimBuffer.CommandSubmitted) -> None:
+        command = event.command.strip()
+        self.query_one("#showcmd", Static).update(f":{command}")
+        if command == "q":
+            self.app.pop_screen()
+            return
+        if command not in ("w", "wq"):
+            self.notify(f"Unknown command: :{command}", severity="warning")
+            return
+        try:
+            payload = json.loads(self.query_one("#editor", VimBuffer).get_text())
+            if not isinstance(payload, dict):
+                raise ValueError("JSON root must be an object")
+            settings = settings_from_dict(payload)
+            save_settings(settings)
+        except json.JSONDecodeError as exc:
+            self.notify(f"Invalid JSON: {exc.msg} (line {exc.lineno})", severity="error")
+            return
+        except (ValueError, OSError) as exc:
+            self.notify(f"Could not save settings: {exc}", severity="error")
+            return
+        self.app.settings = settings
+        self.notify("Settings saved.")
+        if command == "wq":
+            self.app.pop_screen()
 
 
 class ResultScreen(ShellScreen):
-    BINDINGS = [Binding("escape", "back", "Back"), Binding("enter", "back", "Back")]
+    BINDINGS = [Binding("escape", "back", "Back"), Binding("enter", "back", "Back"), Binding("q", "quit", "Quit")]
 
     def __init__(
         self,
@@ -392,7 +250,7 @@ class ResultScreen(ShellScreen):
                     yield Label("Generating Flashback camera edits…", id="result-title")
                     yield Static(f"Replay: {self.replay}\nThis can take a little while.", id="result-box")
                 elif self.error:
-                    yield Label("Generation failed", classes="error")
+                    yield Label("Generation failed", id="result-title", classes="error")
                     yield Static(self.error, id="result-box")
                 elif self.result:
                     cine_s = sum((c.end_tick - c.start_tick) / 20.0 for c in self.result.clips)
@@ -409,21 +267,16 @@ class ResultScreen(ShellScreen):
                     lines.append("Reopen the replay in Flashback to load the new editor state.")
                     yield Label("Generation complete")
                     yield Static("\n".join(lines), id="result-box")
-                with Horizontal(id="button-row"):
-                    yield Button("Back to replays", id="back", variant="primary", disabled=self.running)
-                    yield Button("Quit", id="quit")
+                yield Label("Enter/Escape back to replays  q quit")
             yield Static("", id="status-bar")
             yield Footer()
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "back":
-            self.app.pop_screen()
-        elif event.button.id == "quit":
-            self.app.exit(0)
 
     def action_back(self) -> None:
         if not self.running:
             self.app.pop_screen()
+
+    def action_quit(self) -> None:
+        self.app.exit(0)
 
     def show_result(
         self,
@@ -458,4 +311,3 @@ class ResultScreen(ShellScreen):
             return
         self.query_one("#result-title", Label).update(title)
         self.query_one("#result-box", Static).update(details)
-        self.query_one("#back", Button).disabled = False

@@ -17,16 +17,16 @@ python3 -m pip install -e .
 cinefile
 ```
 
-Opens the interactive terminal UI. Under **Settings**, set:
+Opens the interactive terminal UI. Use the keyboard to select a replay, open **Settings**, and run the selected replay. Settings are edited as JSON in a vim-lite buffer:
 
-- **Input path** — folder of Flashback replay `.zip` files (e.g. `…/flashback/replays`, or `…/flashback`)
-- **Output path** — where editor states are written (e.g. `…/flashback`, or `…/flashback/editor_states`)
+- `i` enters insert mode; Escape returns to normal mode; use `h/j/k/l` or the arrow keys to move.
+- `:w` saves and stays, `:wq` saves and returns, and `:q` returns without saving.
+
+The settings object includes `input_path`, `output_path`, `clip_length_s`, `style_id`, `duration_s`, `project`, `timelapse`, `offline`, `max_ai_usd`, `think`, and `dry_run`. Paths accept a string or `null`; generation fields use the same defaults as the CLI. Older settings files containing only paths continue to work.
 
 Paths are saved to `~/.config/cinefile/settings.json` (or `$XDG_CONFIG_HOME/cinefile/settings.json`).
 
-Choose a replay, adjust run options, and select **Generate edits**. Use the
-keyboard shortcuts shown in the footer to navigate. The title banner area is
-reserved for custom ASCII art and remains blank until supplied.
+Use ↑/↓ to select a replay, Enter or `r` to generate edits with saved settings, `s` to edit settings, and `q` to quit. Enter or Escape returns from the result screen. The title banner area is reserved for custom ASCII art and remains blank until supplied.
 
 ### Flags (scripting)
 
@@ -41,7 +41,7 @@ cinefile \
   --offline
 ```
 
-If `--editor-dir` is omitted, a saved **output path** from settings is used when present; otherwise the editor dir is inferred from the replay path.
+CLI option flags override their saved settings values. If `--editor-dir` is omitted, a saved **output path** from settings is used when present; otherwise the editor dir is inferred from the replay path.
 
 Then **close and reopen** the replay in Flashback so it reloads `editor_states/{uuid}.json`.
 

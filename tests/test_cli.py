@@ -17,9 +17,25 @@ def test_no_replay_launches_textual_tui(monkeypatch):
     monkeypatch.setattr(cli, "_resolve_editor_dir_arg", lambda value: None)
     monkeypatch.setattr("cinefile.tui.CineFileApp", FakeApp, raising=False)
     assert cli.main([]) == 7
-    assert received["options"]["style_id"] == "locked-dolly"
-    assert received["options"]["duration_s"] == 180.0
+    assert received["options"] == {}
     assert received["editor_dir"] is None
+
+
+def test_no_replay_cli_flags_override_saved_settings(monkeypatch):
+    received = {}
+
+    class FakeApp:
+        def __init__(self, *, run_options, editor_dir):
+            received["options"] = run_options
+            received["editor_dir"] = editor_dir
+
+        def run(self):
+            return 0
+
+    monkeypatch.setattr(cli, "_resolve_editor_dir_arg", lambda value: None)
+    monkeypatch.setattr("cinefile.tui.CineFileApp", FakeApp, raising=False)
+    assert cli.main(["--clip-length", "15", "--offline"]) == 0
+    assert received["options"] == {"clip_length_s": 15.0, "offline": True}
 
 
 def test_direct_replay_cli_keeps_pipeline_path(monkeypatch, tmp_path: Path):
