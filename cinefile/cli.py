@@ -83,7 +83,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--offline",
         action="store_true",
         default=None,
-        help="Skip DeepSeek/Jev; use heuristic selection only",
+        help="Skip DeepSeek/Laya; use heuristic selection only",
     )
     p.add_argument(
         "--max-ai-usd",
@@ -121,7 +121,7 @@ def _print_result(result, style: str, offline_flag: bool) -> None:
     print(
         f"AI estimate:  ${result.usage.estimate_usd():.4f} "
         f"(ds in/out={result.usage.deepseek_in}/{result.usage.deepseek_out}, "
-        f"jev in={result.usage.jev_in})"
+        f"laya calls={result.usage.laya_calls})"
     )
     if result.offline or offline_flag:
         print("mode:         offline / heuristic")

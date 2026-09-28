@@ -191,7 +191,7 @@ def _print_result(result: RunResult, style: str, offline_flag: bool) -> None:
     print(
         f"AI estimate:  ${result.usage.estimate_usd():.4f} "
         f"(ds in/out={result.usage.deepseek_in}/{result.usage.deepseek_out}, "
-        f"jev in={result.usage.jev_in})"
+        f"laya calls={result.usage.laya_calls})"
     )
     if result.offline or offline_flag:
         print("mode:         offline / heuristic")

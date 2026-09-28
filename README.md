@@ -59,15 +59,19 @@ cinefile --list-styles
 
 ### AI (optional)
 
-Without keys (or with `--offline`), selection is heuristic-only ($0).
+Candidate windows are re-scored locally with [laya-mlx](https://huggingface.co/aac6fef/laya-mlx)
+(Apple silicon only, installed automatically there; the ~843 MB model downloads from Hugging Face on
+first run). Override the checkpoint with `LAYA_MODEL`. On other platforms this step falls back to
+heuristic scores.
+
+DeepSeek optionally picks the final clips. Without a key (or with `--offline`), selection is heuristic-only ($0).
 
 ```bash
 export DEEPSEEK_API_KEY=...
-export TYPESAFE_API_KEY=...
 cinefile --replay ... --duration 180 --timelapse
 ```
 
-Cost target: well under **$1 per 200 clips** (typically a few cents). Cap with `--max-ai-usd 0.05`.
+Laya is free; `--max-ai-usd 0.05` caps DeepSeek spend (typically a few cents per run).
 
 ## Flags
 

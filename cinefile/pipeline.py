@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
-from .ai import AiConfig, AiUsage, plan_clips_deepseek, score_candidates_jev
+from .ai import AiConfig, AiUsage, laya_available, plan_clips_deepseek, score_candidates_laya
 from .camera import CameraClip, candidate_windows, select_clips_greedy, synthesize_clip
 from .editor import backup_and_write, build_editor_state, resolve_editor_dir
 from .replay import parse_replay
@@ -54,7 +54,7 @@ def run(
 
     cfg = AiConfig(offline=offline, max_ai_usd=max_ai_usd, think=think)
     usage = AiUsage()
-    cands = score_candidates_jev(
+    cands = score_candidates_laya(
         cands, project=project, cfg=cfg, usage=usage
     )
 
@@ -113,5 +113,5 @@ def run(
         clips=clips,
         cuts=len(traj.cuts),
         usage=usage,
-        offline=cfg.offline or not (cfg.deepseek_key or cfg.typesafe_key),
+        offline=cfg.offline or not (cfg.deepseek_key or laya_available(cfg)),
     )

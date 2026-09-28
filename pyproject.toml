@@ -5,13 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "cinefile"
 version = "0.1.0"
-description = "Automated Flashback cinematography CLI (Jev + DeepSeek Flash)"
+description = "Automated Flashback cinematography CLI (local Laya MLX + DeepSeek Flash)"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
   "requests>=2.31",
   "PyYAML>=6.0",
   "textual>=0.80.0",
+  "laya-mlx>=0.2; sys_platform == 'darwin' and platform_machine == 'arm64'",
 ]
 
 [project.optional-dependencies]

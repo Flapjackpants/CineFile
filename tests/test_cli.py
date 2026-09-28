@@ -90,7 +90,7 @@ def test_direct_replay_cli_keeps_pipeline_path(monkeypatch, tmp_path: Path):
     class Usage:
         deepseek_in = 0
         deepseek_out = 0
-        jev_in = 0
+        laya_calls = 0
 
         def estimate_usd(self):
             return 0

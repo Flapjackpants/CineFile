@@ -1,9 +1,10 @@
-"""Direct DeepSeek + Jev API clients with offline fallback."""
+"""DeepSeek API client + local Laya (MLX) scoring with offline fallback."""
 
 from __future__ import annotations
 
 import json
 import os
+import warnings
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -12,20 +13,19 @@ import requests
 # Off-peak list prices per 1M tokens (USD)
 DEEPSEEK_IN = 0.15
 DEEPSEEK_OUT = 0.60
-JEV_IN = 0.042
 
 
 @dataclass
 class AiUsage:
     deepseek_in: int = 0
     deepseek_out: int = 0
-    jev_in: int = 0
+    laya_calls: int = 0
 
     def estimate_usd(self) -> float:
+        # Laya runs locally, so only DeepSeek costs money
         return (
             self.deepseek_in / 1_000_000 * DEEPSEEK_IN
             + self.deepseek_out / 1_000_000 * DEEPSEEK_OUT
-            + self.jev_in / 1_000_000 * JEV_IN
         )
 
 
@@ -35,84 +35,80 @@ class AiConfig:
     max_ai_usd: float = 0.05
     think: bool = False
     deepseek_key: Optional[str] = field(default_factory=lambda: os.getenv("DEEPSEEK_API_KEY"))
-    typesafe_key: Optional[str] = field(
-        default_factory=lambda: os.getenv("TYPESAFE_API_KEY") or os.getenv("JEV_API_KEY")
-    )
     deepseek_base: str = field(
         default_factory=lambda: os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
     )
-    typesafe_base: str = field(
-        default_factory=lambda: os.getenv("TYPESAFE_BASE_URL", "https://api.typesafe.ai")
+    laya_model: str = field(
+        default_factory=lambda: os.getenv("LAYA_MODEL", "aac6fef/laya-mlx")
     )
 
 
-def score_candidates_jev(
+_LAYA_AGENTS: Dict[str, Any] = {}
+
+_LAYA_QUESTION = {
+    "type": "score",
+    "instructions": (
+        "How good is this window as a cinematic Minecraft build clip? "
+        "Prefer active building / interesting movement; avoid idle AFK."
+    ),
+    "criteria": [
+        "Idle or teleport-adjacent",
+        "Mildly interesting",
+        "Good representative action",
+        "Excellent cinematic moment",
+    ],
+}
+
+
+def _load_laya(model_id: str) -> Any:
+    """Load (and cache) a local laya-mlx agent; None if unavailable."""
+    if model_id not in _LAYA_AGENTS:
+        try:
+            import laya_mlx
+
+            # Checkpoint temperature-clamp warning is noise for our score use
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                _LAYA_AGENTS[model_id] = laya_mlx.load(model_id)
+        except Exception:
+            _LAYA_AGENTS[model_id] = None
+    return _LAYA_AGENTS[model_id]
+
+
+def laya_available(cfg: AiConfig) -> bool:
+    return not cfg.offline and _load_laya(cfg.laya_model) is not None
+
+
+def score_candidates_laya(
     candidates: Sequence[Tuple[int, int, float]],
     *,
     project: str,
     cfg: AiConfig,
     usage: AiUsage,
-    batch_size: int = 40,
 ) -> List[Tuple[int, int, float]]:
-    """Re-score candidates with Jev; falls back to heuristic scores."""
-    if cfg.offline or not cfg.typesafe_key:
+    """Re-score candidates with local Laya; falls back to heuristic scores."""
+    if cfg.offline:
+        return list(candidates)
+    agent = _load_laya(cfg.laya_model)
+    if agent is None:
         return list(candidates)
 
+    # Laya has a 512-token context, so score one window per call (~20ms each)
     scored: List[Tuple[int, int, float]] = []
-    for i in range(0, len(candidates), batch_size):
-        batch = candidates[i : i + batch_size]
-        # Rough token estimate before calling
-        est_tokens = 200 + len(batch) * 40
-        if usage.estimate_usd() + est_tokens / 1_000_000 * JEV_IN > cfg.max_ai_usd:
-            scored.extend(batch)
-            continue
-
-        state = {
-            "project": project or "minecraft building session",
-            "windows": [
-                {
-                    "id": f"w{j}",
-                    "start_tick": t0,
-                    "end_tick": t1,
-                    "heuristic_score": round(s, 3),
-                    "duration_s": round((t1 - t0) / 20.0, 2),
-                }
-                for j, (t0, t1, s) in enumerate(batch)
-            ],
-        }
-        questions = {
-            f"w{j}": {
-                "type": "score",
-                "instructions": (
-                    "How good is this window as a cinematic Minecraft build clip? "
-                    "Prefer active building / interesting movement; avoid idle AFK."
-                ),
-                "criteria": [
-                    "Idle or teleport-adjacent",
-                    "Mildly interesting",
-                    "Good representative action",
-                    "Excellent cinematic moment",
-                ],
-            }
-            for j in range(len(batch))
-        }
+    for t0, t1, heur in candidates:
+        text = (
+            f"Project: {project or 'minecraft building session'}. "
+            f"Window {t0 / 20.0:.1f}s-{t1 / 20.0:.1f}s "
+            f"({(t1 - t0) / 20.0:.1f}s). "
+            f"Heuristic activity score {heur:.3f}."
+        )
         try:
-            resp = requests.post(
-                f"{cfg.typesafe_base.rstrip('/')}/v1/systemone",
-                headers={"Authorization": f"Bearer {cfg.typesafe_key}"},
-                json={"model": "jev-latest", "state": state, "questions": questions},
-                timeout=60,
-            )
-            resp.raise_for_status()
-            body = resp.json()
-            usage.jev_in += int(body.get("usage", {}).get("input_tokens", est_tokens))
-            answers = body.get("answers", {})
-            for j, (t0, t1, heur) in enumerate(batch):
-                ans = answers.get(f"w{j}", {})
-                jev_score = float(ans.get("score", 1.0))
-                scored.append((t0, t1, heur * 0.3 + jev_score * 3.0))
+            result = agent.predict(text, {"clip": _LAYA_QUESTION})
+            usage.laya_calls += 1
+            laya_score = float(result["answers"]["clip"].get("score", 1.0))
+            scored.append((t0, t1, heur * 0.3 + laya_score * 3.0))
         except Exception:
-            scored.extend(batch)
+            scored.append((t0, t1, heur))
     scored.sort(key=lambda x: x[2], reverse=True)
     return scored
 
