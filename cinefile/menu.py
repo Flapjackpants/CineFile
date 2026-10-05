@@ -10,8 +10,8 @@ from .settings import (
     Settings,
     expand_user_path,
     load_settings,
-    normalize_input_dir,
-    normalize_render_instance_dir,
+    normalize_input_flashback_folder,
+    normalize_output_flashback_folder,
     save_settings,
 )
 
@@ -55,8 +55,8 @@ def _fmt_path(value: Optional[str]) -> str:
 def _header(settings: Settings) -> None:
     print()
     print("=== CineFile ===")
-    print(f"  Input:  {_fmt_path(settings.input_path)}")
-    print(f"  Render: {_fmt_path(settings.render_instance_path)}")
+    print(f"  Input:  {_fmt_path(settings.input_flashback_folder)}")
+    print(f"  Output: {_fmt_path(settings.output_flashback_folder)}")
 
 
 def list_replay_zips(input_dir: Path) -> list[Path]:
@@ -84,12 +84,12 @@ def _set_path(settings: Settings, field: str, label: str, config_path: Optional[
     except OSError as exc:
         print(f"Invalid path: {exc}")
         return
-    if field == "input_path":
-        path = normalize_input_dir(path)
-        settings.input_path = str(path)
+    if field == "input_flashback_folder":
+        path = normalize_input_flashback_folder(path)
+        settings.input_flashback_folder = str(path)
     else:
-        path = normalize_render_instance_dir(path)
-        settings.render_instance_path = str(path)
+        path = normalize_output_flashback_folder(path)
+        settings.output_flashback_folder = str(path)
     if not path.exists():
         print(f"Warning: path does not exist yet: {path}")
     elif not path.is_dir():
@@ -100,16 +100,16 @@ def _set_path(settings: Settings, field: str, label: str, config_path: Optional[
 
 def _settings_menu(settings: Settings, config_path: Optional[Path]) -> None:
     def set_input() -> Optional[str]:
-        _set_path(settings, "input_path", "Flashback input", config_path)
+        _set_path(settings, "input_flashback_folder", "input Flashback folder", config_path)
         return None
 
     def set_render() -> Optional[str]:
-        _set_path(settings, "render_instance_path", "render instance", config_path)
+        _set_path(settings, "output_flashback_folder", "output Flashback folder", config_path)
         return None
 
     def show() -> Optional[str]:
-        print(f"  Input:  {_fmt_path(settings.input_path)}")
-        print(f"  Render: {_fmt_path(settings.render_instance_path)}")
+        print(f"  Input:  {_fmt_path(settings.input_flashback_folder)}")
+        print(f"  Output: {_fmt_path(settings.output_flashback_folder)}")
         cfg = config_path
         if cfg is None:
             from .settings import default_config_path
@@ -119,15 +119,15 @@ def _settings_menu(settings: Settings, config_path: Optional[Path]) -> None:
         return None
 
     def clear_input() -> Optional[str]:
-        settings.input_path = None
+        settings.input_flashback_folder = None
         save_settings(settings, config_path)
-        print("Cleared input path.")
+        print("Cleared input Flashback folder.")
         return None
 
     def clear_render() -> Optional[str]:
-        settings.render_instance_path = None
+        settings.output_flashback_folder = None
         save_settings(settings, config_path)
-        print("Cleared render instance path.")
+        print("Cleared output Flashback folder.")
         return None
 
     def back() -> Optional[str]:
@@ -136,23 +136,23 @@ def _settings_menu(settings: Settings, config_path: Optional[Path]) -> None:
     _choose(
         "--- Settings ---",
         [
-            ("Set Flashback input path", set_input),
-            ("Set render instance path", set_render),
+            ("Set input Flashback folder", set_input),
+            ("Set output Flashback folder", set_render),
             ("Show current paths", show),
-            ("Clear input path", clear_input),
-            ("Clear render instance path", clear_render),
+            ("Clear input Flashback folder", clear_input),
+            ("Clear output Flashback folder", clear_render),
             ("Back", back),
         ],
     )
 
 
 def _pick_replay(settings: Settings) -> Optional[Path]:
-    if not settings.input_path:
-        print("Set an input path in Settings first.")
+    if not settings.input_flashback_folder:
+        print("Set an input Flashback folder in Settings first.")
         return None
-    input_dir = normalize_input_dir(Path(settings.input_path).expanduser())
+    input_dir = normalize_input_flashback_folder(Path(settings.input_flashback_folder).expanduser())
     if not input_dir.is_dir():
-        print(f"Input path is not a directory: {input_dir}")
+        print(f"Input Flashback folder is not a directory: {input_dir}")
         return None
     zips = list_replay_zips(input_dir)
     if not zips:
@@ -204,8 +204,8 @@ def _create_edits(settings: Settings, run_kwargs: RunKwargs) -> None:
     if replay is None:
         return
     editor_dir = None
-    if settings.render_instance_path:
-        editor_dir = normalize_render_instance_dir(Path(settings.render_instance_path))
+    if settings.output_flashback_folder:
+        editor_dir = normalize_output_flashback_folder(Path(settings.output_flashback_folder))
     kwargs = dict(run_kwargs)
     kwargs["editor_dir"] = editor_dir
     try:

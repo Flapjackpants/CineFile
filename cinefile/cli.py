@@ -32,19 +32,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "-i",
+        "--input-flashback-folder",
         "--input",
+        dest="input_flashback_folder",
         type=Path,
         default=None,
-        help="Prefill the input path in Settings and open the Settings page",
+        help="Prefill the input Flashback folder in Settings and open the Settings page",
     )
     p.add_argument(
         "-o",
+        "--output-flashback-folder",
         "--render-instance",
         "--output",
-        dest="render_instance",
+        dest="output_flashback_folder",
         type=Path,
         default=None,
-        help="Prefill the render instance path in Settings and open the Settings page",
+        help="Prefill the output Flashback folder in Settings and open the Settings page",
     )
     p.add_argument(
         "--clip-length",
@@ -79,7 +82,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--editor-dir",
         type=Path,
         default=None,
-        help="Flashback data dir or instance root. Default: settings render instance or sibling of replays/",
+        help="Flashback data dir or instance root. Default: settings output Flashback folder or sibling of replays/",
     )
     p.add_argument(
         "--offline",
@@ -177,8 +180,8 @@ def main(argv: list[str] | None = None) -> int:
         settings_overrides = {
             key: str(value)
             for key, value in {
-                "input_path": args.input,
-                "render_instance_path": args.render_instance,
+                "input_flashback_folder": args.input_flashback_folder,
+                "output_flashback_folder": args.output_flashback_folder,
             }.items()
             if value is not None
         }

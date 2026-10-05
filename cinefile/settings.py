@@ -34,8 +34,8 @@ def default_config_path() -> Path:
 
 @dataclass
 class Settings:
-    input_path: Optional[str] = None
-    render_instance_path: Optional[str] = None
+    input_flashback_folder: Optional[str] = None
+    output_flashback_folder: Optional[str] = None
     clip_length_s: float = 10.0
     style_id: str = "locked-dolly"
     duration_s: float = 180.0
@@ -50,14 +50,14 @@ class Settings:
         return {key: getattr(self, key) for key in DEFAULT_RUN_OPTIONS}
 
     def input_dir(self) -> Optional[Path]:
-        if not self.input_path:
+        if not self.input_flashback_folder:
             return None
-        return Path(self.input_path).expanduser()
+        return Path(self.input_flashback_folder).expanduser()
 
     def render_dir(self) -> Optional[Path]:
-        if not self.render_instance_path:
+        if not self.output_flashback_folder:
             return None
-        return normalize_render_instance_dir(Path(self.render_instance_path))
+        return normalize_output_flashback_folder(Path(self.output_flashback_folder))
 
 
 def load_settings(path: Optional[Path] = None) -> Settings:
@@ -78,10 +78,13 @@ def load_settings(path: Optional[Path] = None) -> Settings:
 
 def settings_from_dict(data: dict[str, Any], *, normalize_paths: bool = True) -> Settings:
     """Validate an edited settings object and return its normalized values."""
-    input_path = _as_nullable_path(data.get("input_path"), "input_path", normalize=normalize_paths)
-    # Legacy settings files stored the Flashback output dir as output_path.
-    raw_render = data.get("render_instance_path", data.get("output_path"))
-    render_instance_path = _as_nullable_path(raw_render, "render_instance_path", normalize=normalize_paths)
+    # Legacy settings files used input_path, render_instance_path and output_path.
+    raw_input = data.get("input_flashback_folder", data.get("input_path"))
+    input_flashback_folder = _as_nullable_path(raw_input, "input_flashback_folder", normalize=normalize_paths)
+    raw_output = data.get(
+        "output_flashback_folder", data.get("render_instance_path", data.get("output_path"))
+    )
+    output_flashback_folder = _as_nullable_path(raw_output, "output_flashback_folder", normalize=normalize_paths)
     clip_length = _positive_number(data.get("clip_length_s", 10.0), "clip_length_s")
     duration = _positive_number(data.get("duration_s", 180.0), "duration_s")
     max_ai_usd = _nonnegative_number(data.get("max_ai_usd", 0.05), "max_ai_usd")
@@ -98,8 +101,8 @@ def settings_from_dict(data: dict[str, Any], *, normalize_paths: bool = True) ->
             raise ValueError(f"{key} must be true or false")
         booleans[key] = value
     return Settings(
-        input_path=input_path,
-        render_instance_path=render_instance_path,
+        input_flashback_folder=input_flashback_folder,
+        output_flashback_folder=output_flashback_folder,
         clip_length_s=clip_length,
         style_id=style,
         duration_s=duration,
@@ -119,10 +122,10 @@ def _as_nullable_path(value: Any, key: str, *, normalize: bool = True) -> Option
     if not normalize:
         return value.strip()
     path = Path(value.strip()).expanduser().resolve()
-    if key == "input_path":
-        path = normalize_input_dir(path)
+    if key == "input_flashback_folder":
+        path = normalize_input_flashback_folder(path)
     else:
-        path = normalize_render_instance_dir(path)
+        path = normalize_output_flashback_folder(path)
     return str(path)
 
 
@@ -156,7 +159,7 @@ def expand_user_path(raw: str) -> Path:
     return Path(raw.strip()).expanduser().resolve()
 
 
-def normalize_render_instance_dir(path: Path) -> Path:
+def normalize_output_flashback_folder(path: Path) -> Path:
     """Map an instance root, flashback/ or editor_states/ path to the Flashback data dir."""
     p = path.expanduser().resolve()
     if p.name == "editor_states":
@@ -166,7 +169,7 @@ def normalize_render_instance_dir(path: Path) -> Path:
     return p / "flashback"
 
 
-def normalize_input_dir(path: Path) -> Path:
+def normalize_input_flashback_folder(path: Path) -> Path:
     """Prefer a directory that contains replay zips when given flashback/."""
     p = path.expanduser().resolve()
     if p.name == "flashback":

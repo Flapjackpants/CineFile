@@ -53,16 +53,16 @@ def test_input_and_legacy_output_flag_are_passed_to_tui(monkeypatch, tmp_path: P
             return 0
 
     monkeypatch.setattr("cinefile.tui.CineFileApp", FakeApp, raising=False)
-    input_path = tmp_path / "replays"
+    input_flashback_folder = tmp_path / "replays"
     output_path = tmp_path / "flashback"
-    assert cli.main(["-i", str(input_path), "--output", str(output_path)]) == 0
+    assert cli.main(["-i", str(input_flashback_folder), "--output", str(output_path)]) == 0
     assert received["settings_overrides"] == {
-        "input_path": str(input_path),
-        "render_instance_path": str(output_path),
+        "input_flashback_folder": str(input_flashback_folder),
+        "output_flashback_folder": str(output_path),
     }
 
 
-def test_long_input_and_short_render_instance_flags_are_passed_to_tui(monkeypatch, tmp_path: Path):
+def test_long_input_and_short_output_flags_are_passed_to_tui(monkeypatch, tmp_path: Path):
     received = {}
 
     class FakeApp:
@@ -73,16 +73,16 @@ def test_long_input_and_short_render_instance_flags_are_passed_to_tui(monkeypatc
             return 0
 
     monkeypatch.setattr("cinefile.tui.CineFileApp", FakeApp, raising=False)
-    input_path = tmp_path / "replays"
+    input_flashback_folder = tmp_path / "replays"
     output_path = tmp_path / "flashback"
-    assert cli.main(["--input", str(input_path), "-o", str(output_path)]) == 0
+    assert cli.main(["--input", str(input_flashback_folder), "-o", str(output_path)]) == 0
     assert received["settings_overrides"] == {
-        "input_path": str(input_path),
-        "render_instance_path": str(output_path),
+        "input_flashback_folder": str(input_flashback_folder),
+        "output_flashback_folder": str(output_path),
     }
 
 
-def test_long_render_instance_flag_is_passed_to_tui(monkeypatch, tmp_path: Path):
+def test_long_output_flag_is_passed_to_tui(monkeypatch, tmp_path: Path):
     received = {}
 
     class FakeApp:
@@ -95,7 +95,7 @@ def test_long_render_instance_flag_is_passed_to_tui(monkeypatch, tmp_path: Path)
     monkeypatch.setattr("cinefile.tui.CineFileApp", FakeApp, raising=False)
     instance = tmp_path / "Render"
     assert cli.main(["--render-instance", str(instance)]) == 0
-    assert received["settings_overrides"] == {"render_instance_path": str(instance)}
+    assert received["settings_overrides"] == {"output_flashback_folder": str(instance)}
 
 
 def test_direct_replay_cli_keeps_pipeline_path(monkeypatch, tmp_path: Path):

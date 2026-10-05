@@ -23,7 +23,7 @@ from textual.widgets import (
 
 from .menu import list_replay_zips
 from .pipeline import RunResult, run
-from .settings import Settings, load_settings, normalize_input_dir, save_settings, settings_from_dict
+from .settings import Settings, load_settings, normalize_input_flashback_folder, save_settings, settings_from_dict
 from .vim_buffer import VimBuffer
 
 
@@ -112,12 +112,12 @@ class ReplayScreen(ShellScreen):
         table = self.query_one("#replay-table", DataTable)
         table.clear()
         settings = self.app.settings
-        if not settings.input_path:
+        if not settings.input_flashback_folder:
             self.query_one("#status-bar", Static).update(
                 "Set an input folder in Settings to browse replays."
             )
             return
-        input_dir = normalize_input_dir(Path(settings.input_path).expanduser())
+        input_dir = normalize_input_flashback_folder(Path(settings.input_flashback_folder).expanduser())
         for replay in list_replay_zips(input_dir):
             try:
                 location = str(replay.relative_to(input_dir))

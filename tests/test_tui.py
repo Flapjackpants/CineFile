@@ -19,7 +19,7 @@ def test_replay_browser_lists_zips_and_has_no_buttons(tmp_path: Path):
     (nested / "nested.zip").write_bytes(b"zip")
     (nested / "ignore.txt").write_text("not a replay")
     app = CineFileApp()
-    app.settings = Settings(input_path=str(replay_dir))
+    app.settings = Settings(input_flashback_folder=str(replay_dir))
 
     async def check():
         async with app.run_test() as pilot:
@@ -37,14 +37,14 @@ def test_cli_path_overrides_open_settings_and_save_with_saved_fallback(monkeypat
     from cinefile import tui
 
     saved_settings = Settings(
-        input_path=str(tmp_path / "saved-replays"),
-        render_instance_path=str(tmp_path / "saved-flashback"),
+        input_flashback_folder=str(tmp_path / "saved-replays"),
+        output_flashback_folder=str(tmp_path / "saved-flashback"),
     )
     saved = []
     monkeypatch.setattr(tui, "load_settings", lambda: saved_settings)
     monkeypatch.setattr(tui, "save_settings", lambda settings: saved.append(settings))
-    input_path = tmp_path / "cli-replays"
-    app = CineFileApp(settings_overrides={"input_path": str(input_path)})
+    input_flashback_folder = tmp_path / "cli-replays"
+    app = CineFileApp(settings_overrides={"input_flashback_folder": str(input_flashback_folder)})
 
     async def check():
         async with app.run_test() as pilot:
@@ -53,15 +53,15 @@ def test_cli_path_overrides_open_settings_and_save_with_saved_fallback(monkeypat
             assert saved == []
             editor = app.screen.query_one("#editor", VimBuffer)
             data = json.loads(editor.get_text())
-            assert data["input_path"] == str(input_path)
-            assert data["render_instance_path"] == saved_settings.render_instance_path
+            assert data["input_flashback_folder"] == str(input_flashback_folder)
+            assert data["output_flashback_folder"] == saved_settings.output_flashback_folder
 
             app.screen.on_vim_buffer_command_submitted(VimBuffer.CommandSubmitted("wq"))
             await pilot.pause()
             assert isinstance(app.screen, ReplayScreen)
             assert len(saved) == 1
-            assert saved[0].input_path == str(input_path.resolve())
-            assert saved[0].render_instance_path == str((tmp_path / "saved-flashback" / "flashback").resolve())
+            assert saved[0].input_flashback_folder == str(input_flashback_folder.resolve())
+            assert saved[0].output_flashback_folder == str((tmp_path / "saved-flashback" / "flashback").resolve())
 
     asyncio.run(check())
 
@@ -80,8 +80,8 @@ def test_settings_json_editor_saves_and_closes(monkeypatch, tmp_path: Path):
             assert isinstance(app.screen, SettingsScreen)
             editor = app.screen.query_one("#editor", VimBuffer)
             data = vars(Settings(
-                input_path=str(tmp_path / "replays"),
-                render_instance_path=str(tmp_path / "flashback"),
+                input_flashback_folder=str(tmp_path / "replays"),
+                output_flashback_folder=str(tmp_path / "flashback"),
                 clip_length_s=12,
                 style_id="hero-low",
                 duration_s=90,
@@ -98,8 +98,8 @@ def test_settings_json_editor_saves_and_closes(monkeypatch, tmp_path: Path):
             assert isinstance(app.screen, ReplayScreen)
             assert app.settings.clip_length_s == 12
             assert app.settings.style_id == "hero-low"
-            assert app.settings.input_path == str((tmp_path / "replays").resolve())
-            assert app.settings.render_instance_path == str((tmp_path / "flashback").resolve())
+            assert app.settings.input_flashback_folder == str((tmp_path / "replays").resolve())
+            assert app.settings.output_flashback_folder == str((tmp_path / "flashback").resolve())
             assert saved == [app.settings]
 
     asyncio.run(check())
@@ -166,7 +166,7 @@ def test_replay_run_uses_persisted_generation_settings(monkeypatch, tmp_path: Pa
     replay.write_bytes(b"zip")
     app = CineFileApp()
     app.settings = Settings(
-        input_path=str(replay_dir),
+        input_flashback_folder=str(replay_dir),
         clip_length_s=12,
         style_id="hero-low",
         duration_s=90,
@@ -306,7 +306,7 @@ def test_settings_editor_handles_paste_event(monkeypatch, tmp_path: Path):
 
     monkeypatch.setattr(tui, "load_settings", lambda: Settings())
     monkeypatch.setattr(tui, "save_settings", lambda settings: None)
-    app = CineFileApp(settings_overrides={"input_path": str(tmp_path)})
+    app = CineFileApp(settings_overrides={"input_flashback_folder": str(tmp_path)})
 
     async def check():
         async with app.run_test() as pilot:
@@ -324,7 +324,7 @@ def test_settings_editor_p_puts_clipboard(monkeypatch, tmp_path: Path):
 
     monkeypatch.setattr(tui, "load_settings", lambda: Settings())
     monkeypatch.setattr(vim_buffer, "read_system_clipboard", lambda: "Q")
-    app = CineFileApp(settings_overrides={"input_path": str(tmp_path)})
+    app = CineFileApp(settings_overrides={"input_flashback_folder": str(tmp_path)})
 
     async def check():
         async with app.run_test() as pilot:
@@ -341,7 +341,7 @@ def test_settings_editor_p_empty_clipboard(monkeypatch, tmp_path: Path):
 
     monkeypatch.setattr(tui, "load_settings", lambda: Settings())
     monkeypatch.setattr(vim_buffer, "read_system_clipboard", lambda: None)
-    app = CineFileApp(settings_overrides={"input_path": str(tmp_path)})
+    app = CineFileApp(settings_overrides={"input_flashback_folder": str(tmp_path)})
 
     async def check():
         async with app.run_test() as pilot:

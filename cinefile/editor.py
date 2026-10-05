@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from .camera import CameraClip
-from .settings import normalize_render_instance_dir
+from .settings import normalize_output_flashback_folder
 
 
 DEFAULT_VISUALS: Dict[str, Any] = {
@@ -166,7 +166,7 @@ def build_editor_state(
 
 def normalize_editor_dir(path: Path) -> Path:
     """Accept an instance root, …/flashback or …/editor_states; return the Flashback data dir."""
-    return normalize_render_instance_dir(path)
+    return normalize_output_flashback_folder(path)
 
 
 def resolve_editor_dir(replay_path: Path, editor_dir: Optional[Path]) -> Path:
