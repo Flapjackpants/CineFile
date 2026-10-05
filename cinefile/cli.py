@@ -115,6 +115,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Let DeepSeek score the top clips from rendered preview images (needs DEEPSEEK_API_KEY)",
     )
     p.add_argument(
+        "--tries",
+        type=int,
+        default=None,
+        help="Camera variants to score per clip; in auto style, split evenly across styles (default: saved setting, initially 1)",
+    )
+    p.add_argument(
         "--list-styles",
         action="store_true",
         help="Print available styles and exit",
@@ -177,6 +183,7 @@ def main(argv: list[str] | None = None) -> int:
             "think": args.think,
             "dry_run": args.dry_run,
             "visual_review": args.visual_review,
+            "tries": args.tries,
         }.items()
         if value is not None
     }

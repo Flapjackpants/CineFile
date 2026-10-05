@@ -26,7 +26,7 @@ from .editor import (
 from .framing import best_clip, framing_multiplier, framing_note
 from .preview import clip_previews
 from .replay import parse_replay
-from .styles_loader import resolve_styles
+from .styles_loader import resolve_styles, tries_per_style
 from .world import load_world
 
 
@@ -57,9 +57,11 @@ def run(
     think: bool = False,
     dry_run: bool = False,
     visual_review: bool = False,
+    tries: int = 1,
     max_candidates: int = 500,
 ) -> RunResult:
     styles = resolve_styles(style_id)
+    per_style = tries_per_style(tries, len(styles))
     traj = parse_replay(replay)
     world = load_world(replay, traj.chunk_refs)
     ed_dir = resolve_editor_dir(replay, editor_dir)
@@ -90,7 +92,7 @@ def run(
     usage = AiUsage()
     best = {}
     for t0, t1, _ in cands:
-        r = best_clip(traj, t0, t1, styles, world=world)
+        r = best_clip(traj, t0, t1, styles, world=world, tries_per_style=per_style)
         if r:
             best[(t0, t1)] = r
     cands = [c for c in cands if (c[0], c[1]) in best]

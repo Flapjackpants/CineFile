@@ -235,6 +235,7 @@ def run_menu(
     kwargs.setdefault("think", False)
     kwargs.setdefault("dry_run", False)
     kwargs.setdefault("visual_review", False)
+    kwargs.setdefault("tries", 1)
 
     while True:
         _header(settings)

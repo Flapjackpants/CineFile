@@ -14,7 +14,13 @@ from cinefile.framing import (
     project_to_screen,
 )
 from cinefile.replay import Pose
-from cinefile.styles_loader import Style, list_styles, resolve_styles
+from cinefile.styles_loader import (
+    Style,
+    list_styles,
+    resolve_styles,
+    style_variant,
+    tries_per_style,
+)
 
 
 def _clip(x0=0.0, x1=0.0, y=1.0, t0=0, t1=100):
@@ -138,3 +144,33 @@ def test_best_clip_avoids_walls():
     world = SimpleNamespace(is_solid=lambda x, y, z, t: x > 3, ray_blocked=lambda a, b, t: False)
     clip, _ = best_clip(traj, 0, 100, [b, a], world=world)
     assert clip.style_id == "a"
+
+
+def test_tries_per_style():
+    assert tries_per_style(20, 5) == 4
+    assert tries_per_style(1, 5) == 1
+    assert tries_per_style(12, 5) == 2
+    assert tries_per_style(7, 1) == 7
+    assert tries_per_style(13, 5) == 3
+
+
+def test_style_variant_zero_is_base():
+    s = Style("a", "d", 6.0, 1.0, 2.0, 3.0, True, 90.0, 1.0, "left")
+    assert style_variant(s, 0, 40) == s
+
+
+def test_style_variant_deterministic():
+    s = Style("a", "d", 6.0, 1.0, 2.0, 3.0, True, 90.0, 1.0, "left")
+    v1 = style_variant(s, 3, 40)
+    v2 = style_variant(s, 3, 40)
+    assert v1 == v2 and v1 != s
+    assert (v1.id, v1.yaw_lock, v1.thirds_side) == (s.id, s.yaw_lock, s.thirds_side)
+
+
+def test_more_tries_never_worse():
+    traj = SimpleNamespace(sample=lambda t: Pose(0, 64, 0, 0, 0))
+    a = _style("a", True, 0.0)
+    world = SimpleNamespace(is_solid=lambda x, y, z, t: x > 3, ray_blocked=lambda a, b, t: False)
+    one = best_clip(traj, 0, 100, [a], world=world, tries_per_style=1)
+    six = best_clip(traj, 0, 100, [a], world=world, tries_per_style=6)
+    assert framing_multiplier(six[1]) >= framing_multiplier(one[1])

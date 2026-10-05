@@ -139,3 +139,7 @@ def test_style_auto_flag():
 
 def test_visual_review_flag():
     assert cli.build_parser().parse_args(["--visual-review"]).visual_review is True
+
+
+def test_tries_flag():
+    assert cli.build_parser().parse_args(["--tries", "20"]).tries == 20

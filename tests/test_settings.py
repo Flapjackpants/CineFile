@@ -47,6 +47,7 @@ def test_legacy_path_only_settings_load_with_generation_defaults(tmp_path: Path)
         "think": False,
         "dry_run": False,
         "visual_review": False,
+        "tries": 1,
     }
 
 
@@ -138,3 +139,13 @@ def test_visual_review_setting():
         pass
     else:
         raise AssertionError("accepted invalid visual_review")
+
+
+def test_tries_setting_validation():
+    import pytest
+
+    base = {"input_flashback_folder": None, "output_flashback_folder": None}
+    assert settings_from_dict({**base, "tries": 20}).tries == 20
+    for bad in (0, 101, 2.5, 2.0, True, "3"):
+        with pytest.raises(ValueError, match="tries must be an integer from 1 to 100"):
+            settings_from_dict({**base, "tries": bad})

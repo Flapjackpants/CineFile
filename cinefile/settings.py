@@ -23,6 +23,7 @@ DEFAULT_RUN_OPTIONS: dict[str, Any] = {
     "think": False,
     "dry_run": False,
     "visual_review": False,
+    "tries": 1,
 }
 
 
@@ -47,6 +48,7 @@ class Settings:
     think: bool = False
     dry_run: bool = False
     visual_review: bool = False
+    tries: int = 1
 
     def run_options(self) -> dict[str, Any]:
         return {key: getattr(self, key) for key in DEFAULT_RUN_OPTIONS}
@@ -90,6 +92,7 @@ def settings_from_dict(data: dict[str, Any], *, normalize_paths: bool = True) ->
     clip_length = _positive_number(data.get("clip_length_s", 10.0), "clip_length_s")
     duration = _positive_number(data.get("duration_s", 180.0), "duration_s")
     max_ai_usd = _nonnegative_number(data.get("max_ai_usd", 0.05), "max_ai_usd")
+    tries = _positive_int(data.get("tries", 1), "tries")
     style = data.get("style_id", "locked-dolly")
     if not isinstance(style, str) or style not in style_choices():
         raise ValueError(f"style_id must be one of: {', '.join(style_choices())}")
@@ -110,6 +113,7 @@ def settings_from_dict(data: dict[str, Any], *, normalize_paths: bool = True) ->
         duration_s=duration,
         project=project,
         max_ai_usd=max_ai_usd,
+        tries=tries,
         **booleans,
     )
 
@@ -138,6 +142,12 @@ def _positive_number(value: Any, key: str) -> float:
     if not math.isfinite(result) or result <= 0:
         raise ValueError(f"{key} must be a positive number")
     return result
+
+
+def _positive_int(value: Any, key: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 100:
+        raise ValueError(f"{key} must be an integer from 1 to 100")
+    return value
 
 
 def _nonnegative_number(value: Any, key: str) -> float:

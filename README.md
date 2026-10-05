@@ -53,6 +53,7 @@ Settings are saved to `~/.config/cinefile/settings.json` (or `$XDG_CONFIG_HOME/c
 | `think` | Allow higher DeepSeek reasoning effort (costs more). |
 | `dry_run` | Write `*.json.dry_run` files instead of changing the editor state. |
 | `visual_review` | Render preview images of the top clips and let DeepSeek score them. Needs `DEEPSEEK_API_KEY`. |
+| `tries` | Camera variants scored per clip; the best-framed one is kept. With `style_id: auto`, each style gets about `tries ÷ number of styles` variants (at least 1). Higher is slower. |
 
 Clips whose camera passes through blocks, or whose view of the player is blocked, are scored lower when the replay contains chunk caches.
 
@@ -137,3 +138,4 @@ Laya is free; `--max-ai-usd 0.05` caps DeepSeek spend (typically a few cents per
 | `--editor-dir` | Instance root or `flashback/` folder (overrides the settings output Flashback folder) |
 | `--dry-run` | Write `*.json.dry_run` instead of replacing state |
 | `--visual-review` | Let DeepSeek score the top clips from rendered preview images |
+| `--tries` | Camera variants scored per clip (see `tries` setting) |

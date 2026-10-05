@@ -97,7 +97,7 @@ def _fake_pipeline(monkeypatch, cands, seen):
     monkeypatch.setattr(
         pipeline,
         "best_clip",
-        lambda traj, t0, t1, styles, world=None: (_clip(t0, t1), FramingStats(1.0, 1.0, 0.0, 1.0)),
+        lambda traj, t0, t1, styles, world=None, tries_per_style=1: (_clip(t0, t1), FramingStats(1.0, 1.0, 0.0, 1.0)),
     )
 
     def greedy(candidates, traj, style, target_ticks, min_gap_ticks=0, synth=None):

@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import random
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Dict, List
 
@@ -61,6 +62,26 @@ def resolve_styles(style_id: str) -> List[Style]:
     if style_id == AUTO_STYLE_ID:
         return [load_style(s) for s in list_styles()]
     return [load_style(style_id)]
+
+
+def style_variant(style: Style, index: int, t0: int) -> Style:
+    """Deterministic jittered copy of a style; index 0 is the unchanged preset."""
+    if index == 0:
+        return style
+    rng = random.Random(f"{style.id}:{t0}:{index}")
+    return replace(
+        style,
+        distance=style.distance * rng.uniform(0.8, 1.25),
+        height=style.height + rng.uniform(-1.0, 1.0),
+        lateral=style.lateral * rng.uniform(0.6, 1.4),
+        pitch=style.pitch + rng.uniform(-6.0, 6.0),
+        orbit_degrees=style.orbit_degrees * rng.uniform(0.7, 1.3),
+        dolly_scale=style.dolly_scale * rng.uniform(0.85, 1.15),
+    )
+
+
+def tries_per_style(tries: int, n_styles: int) -> int:
+    return max(1, (tries + n_styles // 2) // n_styles)
 
 
 def styles_as_dict() -> Dict[str, str]:
