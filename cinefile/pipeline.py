@@ -6,7 +6,14 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import List, Optional
 
-from .ai import AiConfig, AiUsage, laya_available, plan_clips_deepseek, score_candidates_laya
+from .ai import (
+    AiConfig,
+    AiUsage,
+    laya_available,
+    plan_clips_deepseek,
+    review_clips_visual,
+    score_candidates_laya,
+)
 from .camera import CameraClip, candidate_windows, select_clips_greedy
 from .editor import (
     backup_and_write,
@@ -17,8 +24,10 @@ from .editor import (
     resolve_editor_dir,
 )
 from .framing import best_clip, framing_multiplier, framing_note
+from .preview import clip_previews
 from .replay import parse_replay
 from .styles_loader import resolve_styles
+from .world import load_world
 
 
 @dataclass
@@ -30,6 +39,8 @@ class RunResult:
     usage: AiUsage
     offline: bool
     merged: bool = False
+    world_loaded: bool = False
+    visual_reviewed: bool = False
 
 
 def run(
@@ -45,10 +56,12 @@ def run(
     max_ai_usd: float = 0.05,
     think: bool = False,
     dry_run: bool = False,
+    visual_review: bool = False,
     max_candidates: int = 500,
 ) -> RunResult:
     styles = resolve_styles(style_id)
     traj = parse_replay(replay)
+    world = load_world(replay, traj.chunk_refs)
     ed_dir = resolve_editor_dir(replay, editor_dir)
     existing = load_existing_state(ed_dir, traj.meta.uuid)
     occupied = occupied_ranges(existing) if existing is not None else []
@@ -71,11 +84,13 @@ def run(
         if not cands:
             raise RuntimeError("No empty space left in existing editor state for new clips.")
 
-    cfg = AiConfig(offline=offline, max_ai_usd=max_ai_usd, think=think)
+    cfg = AiConfig(
+        offline=offline, max_ai_usd=max_ai_usd, think=think, visual_review=visual_review
+    )
     usage = AiUsage()
     best = {}
     for t0, t1, _ in cands:
-        r = best_clip(traj, t0, t1, styles)
+        r = best_clip(traj, t0, t1, styles, world=world)
         if r:
             best[(t0, t1)] = r
     cands = [c for c in cands if (c[0], c[1]) in best]
@@ -96,6 +111,17 @@ def run(
         key=lambda c: c[2],
         reverse=True,
     )
+
+    visual_reviewed = False
+    if visual_review and world is not None:
+        finalists = cands[: min(8, target_clips)]
+        previews = [clip_previews(world, traj, best[(t0, t1)][0]) for t0, t1, _ in finalists]
+        scores = review_clips_visual(previews, project=project, cfg=cfg, usage=usage)
+        if scores:
+            boost = {(t0, t1): 0.5 + v / 10.0 for (t0, t1, _), v in zip(finalists, scores)}
+            cands = sorted(((t0, t1, s * boost.get((t0, t1), 1.0)) for t0, t1, s in cands),
+                           key=lambda c: c[2], reverse=True)
+            visual_reviewed = True
 
     def synth(t0, t1, score):
         r = best.get((t0, t1))
@@ -171,4 +197,6 @@ def run(
         usage=usage,
         offline=cfg.offline or not (cfg.deepseek_key or laya_available(cfg)),
         merged=existing is not None,
+        world_loaded=world is not None,
+        visual_reviewed=visual_reviewed,
     )

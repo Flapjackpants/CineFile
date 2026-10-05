@@ -87,16 +87,17 @@ def test_load_existing_state_refuses_corrupt_file(tmp_path: Path):
 
 
 def _fake_pipeline(monkeypatch, cands, seen):
-    traj = SimpleNamespace(meta=SimpleNamespace(uuid="abc", total_ticks=2000), cuts=[])
+    traj = SimpleNamespace(meta=SimpleNamespace(uuid="abc", total_ticks=2000), cuts=[], chunk_refs=[])
     monkeypatch.setattr(pipeline, "parse_replay", lambda replay: traj)
     monkeypatch.setattr(pipeline, "candidate_windows", lambda *a, **k: list(cands))
     monkeypatch.setattr(pipeline, "score_candidates_laya", lambda c, **k: c)
     monkeypatch.setattr(pipeline, "plan_clips_deepseek", lambda *a, **k: [])
+    monkeypatch.setattr(pipeline, "load_world", lambda *a, **k: None)
 
     monkeypatch.setattr(
         pipeline,
         "best_clip",
-        lambda traj, t0, t1, styles: (_clip(t0, t1), FramingStats(1.0, 1.0, 0.0, 1.0)),
+        lambda traj, t0, t1, styles, world=None: (_clip(t0, t1), FramingStats(1.0, 1.0, 0.0, 1.0)),
     )
 
     def greedy(candidates, traj, style, target_ticks, min_gap_ticks=0, synth=None):

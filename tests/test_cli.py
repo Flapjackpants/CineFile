@@ -135,3 +135,7 @@ def test_direct_replay_cli_keeps_pipeline_path(monkeypatch, tmp_path: Path):
 
 def test_style_auto_flag():
     assert cli.build_parser().parse_args(["--style", "auto"]).style == "auto"
+
+
+def test_visual_review_flag():
+    assert cli.build_parser().parse_args(["--visual-review"]).visual_review is True

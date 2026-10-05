@@ -100,3 +100,41 @@ def test_best_clip_prefers_framed_style():
 def test_resolve_auto():
     assert [s.id for s in resolve_styles("auto")] == list_styles()
     assert len(resolve_styles("auto")) == 5
+
+
+def _world(solid=False, blocked=False):
+    return SimpleNamespace(
+        is_solid=lambda x, y, z, t: solid, ray_blocked=lambda a, b, t: blocked
+    )
+
+
+def _centered_traj():
+    return SimpleNamespace(sample=lambda t: Pose(0, 0, 10, 0, 0))
+
+
+def test_inside_wall_penalized():
+    s = framing_stats(_centered_traj(), _clip(), world=_world(solid=True))
+    assert s.inside_frac == 1.0 and s.world_checked
+    base = framing_multiplier(FramingStats(s.onscreen_frac, s.center_frac, s.thirds_frac, s.score))
+    assert framing_multiplier(s) == pytest.approx(0.05 * base)
+
+
+def test_occlusion_penalized():
+    s = framing_stats(_centered_traj(), _clip(), world=_world(blocked=True))
+    assert s.occluded_frac == 1.0 and s.inside_frac == 0.0
+    base = framing_multiplier(FramingStats(s.onscreen_frac, s.center_frac, s.thirds_frac, s.score))
+    assert framing_multiplier(s) == pytest.approx(0.4 * base)
+
+
+def test_framing_note_world():
+    s = FramingStats(1.0, 0.5, 0.25, 0.7, inside_frac=1.0, occluded_frac=0.0, world_checked=True)
+    assert framing_note(s, "hero").endswith(" Camera inside blocks 100%, view blocked 0%.")
+
+
+def test_best_clip_avoids_walls():
+    traj = SimpleNamespace(sample=lambda t: Pose(0, 64, 0, 0, 0))
+    a = Style("a", "", 6.0, 1.0, 0.0, 0.0, True, 0.0, 1.0, "auto")
+    b = Style("b", "", 6.0, 1.0, 5.0, 0.0, True, 0.0, 1.0, "auto")
+    world = SimpleNamespace(is_solid=lambda x, y, z, t: x > 3, ray_blocked=lambda a, b, t: False)
+    clip, _ = best_clip(traj, 0, 100, [b, a], world=world)
+    assert clip.style_id == "a"

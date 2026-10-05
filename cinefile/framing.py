@@ -24,6 +24,9 @@ class FramingStats:
     center_frac: float
     thirds_frac: float
     score: float
+    inside_frac: float = 0.0
+    occluded_frac: float = 0.0
+    world_checked: bool = False
 
     @property
     def near_frac(self) -> float:
@@ -74,9 +77,9 @@ def camera_at(
     )
 
 
-def framing_stats(traj, clip: CameraClip, samples: int = 20) -> FramingStats:
+def framing_stats(traj, clip: CameraClip, samples: int = 20, world=None) -> FramingStats:
     span = clip.end_tick - clip.start_tick
-    n = on = cen = thi = 0
+    n = on = cen = thi = occ = 0
     total = 0.0
     for i in range(samples):
         t = round(clip.start_tick + i * span / (samples - 1))
@@ -84,7 +87,11 @@ def framing_stats(traj, clip: CameraClip, samples: int = 20) -> FramingStats:
         if p is None:
             continue
         n += 1
-        uv = project_to_screen(camera_at(clip, t), (p.x, p.y + SUBJECT_HEIGHT, p.z))
+        cam = camera_at(clip, t)
+        subject = (p.x, p.y + SUBJECT_HEIGHT, p.z)
+        if world is not None and world.ray_blocked(cam[:3], subject, t):
+            occ += 1
+        uv = project_to_screen(cam, subject)
         if uv is None or not (0 <= uv[0] <= 1 and 0 <= uv[1] <= 1):
             continue
         on += 1
@@ -100,32 +107,50 @@ def framing_stats(traj, clip: CameraClip, samples: int = 20) -> FramingStats:
         )
     if n == 0:
         return FramingStats(0, 0, 0, 0.0)
-    return FramingStats(on / n, cen / n, thi / n, total / n)
+    stats = FramingStats(on / n, cen / n, thi / n, total / n)
+    if world is not None:
+        ticks = range(clip.start_tick, clip.end_tick + 1)
+        inside = 0
+        for t in ticks:
+            x, y, z = camera_at(clip, t)[:3]
+            if world.is_solid(math.floor(x), math.floor(y), math.floor(z), t):
+                inside += 1
+        stats.inside_frac = inside / len(ticks)
+        stats.occluded_frac = occ / n
+        stats.world_checked = True
+    return stats
 
 
 def framing_multiplier(stats: FramingStats) -> float:
     m = 0.3 + 0.7 * stats.score
     if stats.near_frac < 0.5:
         m *= 0.5
+    m *= max(0.05, (1 - stats.inside_frac) ** 3) * (1 - 0.6 * stats.occluded_frac)
     return m
 
 
 def framing_note(stats: FramingStats, style_id: str) -> str:
-    return (
+    note = (
         f"Framing ({style_id}): subject on screen {stats.onscreen_frac:.0%}, "
         f"centered {stats.center_frac:.0%}, on thirds {stats.thirds_frac:.0%}."
     )
+    if stats.world_checked:
+        note += (
+            f" Camera inside blocks {stats.inside_frac:.0%}, "
+            f"view blocked {stats.occluded_frac:.0%}."
+        )
+    return note
 
 
 def best_clip(
-    traj, t0: int, t1: int, styles: Sequence[Style]
+    traj, t0: int, t1: int, styles: Sequence[Style], world=None
 ) -> Optional[Tuple[CameraClip, FramingStats]]:
     best: Optional[Tuple[CameraClip, FramingStats]] = None
     for style in styles:
         clip = synthesize_clip(traj, t0, t1, style)
         if clip is None:
             continue
-        stats = framing_stats(traj, clip)
-        if best is None or stats.score > best[1].score:
+        stats = framing_stats(traj, clip, world=world)
+        if best is None or framing_multiplier(stats) > framing_multiplier(best[1]):
             best = (clip, stats)
     return best

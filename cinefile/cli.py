@@ -109,6 +109,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Write *.json.dry_run instead of replacing editor state",
     )
     p.add_argument(
+        "--visual-review",
+        action="store_true",
+        default=None,
+        help="Let DeepSeek score the top clips from rendered preview images (needs DEEPSEEK_API_KEY)",
+    )
+    p.add_argument(
         "--list-styles",
         action="store_true",
         help="Print available styles and exit",
@@ -125,6 +131,9 @@ def _print_result(result, style: str, offline_flag: bool) -> None:
     print(f"wrote:        {result.editor_state_path}")
     if result.merged:
         print("merged:       into existing editor state (existing keyframes kept)")
+    print(f"world blocks: {'loaded' if getattr(result, 'world_loaded', False) else 'unavailable'}")
+    if getattr(result, 'visual_reviewed', False):
+        print("visual:       DeepSeek image review applied")
     print(
         f"AI estimate:  ${result.usage.estimate_usd():.4f} "
         f"(ds in/out={result.usage.deepseek_in}/{result.usage.deepseek_out}, "
@@ -167,6 +176,7 @@ def main(argv: list[str] | None = None) -> int:
             "max_ai_usd": args.max_ai_usd,
             "think": args.think,
             "dry_run": args.dry_run,
+            "visual_review": args.visual_review,
         }.items()
         if value is not None
     }

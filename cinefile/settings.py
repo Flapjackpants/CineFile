@@ -22,6 +22,7 @@ DEFAULT_RUN_OPTIONS: dict[str, Any] = {
     "max_ai_usd": 0.05,
     "think": False,
     "dry_run": False,
+    "visual_review": False,
 }
 
 
@@ -45,6 +46,7 @@ class Settings:
     max_ai_usd: float = 0.05
     think: bool = False
     dry_run: bool = False
+    visual_review: bool = False
 
     def run_options(self) -> dict[str, Any]:
         return {key: getattr(self, key) for key in DEFAULT_RUN_OPTIONS}
@@ -95,7 +97,7 @@ def settings_from_dict(data: dict[str, Any], *, normalize_paths: bool = True) ->
     if not isinstance(project, str):
         raise ValueError("project must be a string")
     booleans = {}
-    for key in ("timelapse", "offline", "think", "dry_run"):
+    for key in ("timelapse", "offline", "think", "dry_run", "visual_review"):
         value = data.get(key, False)
         if not isinstance(value, bool):
             raise ValueError(f"{key} must be true or false")

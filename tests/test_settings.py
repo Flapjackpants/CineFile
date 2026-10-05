@@ -46,6 +46,7 @@ def test_legacy_path_only_settings_load_with_generation_defaults(tmp_path: Path)
         "max_ai_usd": 0.05,
         "think": False,
         "dry_run": False,
+        "visual_review": False,
     }
 
 
@@ -127,3 +128,13 @@ def test_legacy_input_path_and_render_instance_path_migrate(tmp_path: Path):
 
 def test_settings_accept_auto_style():
     assert settings_from_dict({"style_id": "auto"}).style_id == "auto"
+
+
+def test_visual_review_setting():
+    assert settings_from_dict({"visual_review": True}).visual_review is True
+    try:
+        settings_from_dict({"visual_review": "yes"})
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("accepted invalid visual_review")

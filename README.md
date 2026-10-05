@@ -52,6 +52,9 @@ Settings are saved to `~/.config/cinefile/settings.json` (or `$XDG_CONFIG_HOME/c
 | `max_ai_usd` | Maximum DeepSeek spend per run, in USD. |
 | `think` | Allow higher DeepSeek reasoning effort (costs more). |
 | `dry_run` | Write `*.json.dry_run` files instead of changing the editor state. |
+| `visual_review` | Render preview images of the top clips and let DeepSeek score them. Needs `DEEPSEEK_API_KEY`. |
+
+Clips whose camera passes through blocks, or whose view of the player is blocked, are scored lower when the replay contains chunk caches.
 
 Both paths accept a string or `null`. Other settings use the same defaults as the CLI. Older settings files still work: legacy `input_path`, `render_instance_path` and `output_path` keys are migrated to the new names.
 
@@ -133,3 +136,4 @@ Laya is free; `--max-ai-usd 0.05` caps DeepSeek spend (typically a few cents per
 | `--timelapse` | Fill gaps with 1s (`0→20` tick) timelapse tracks |
 | `--editor-dir` | Instance root or `flashback/` folder (overrides the settings output Flashback folder) |
 | `--dry-run` | Write `*.json.dry_run` instead of replacing state |
+| `--visual-review` | Let DeepSeek score the top clips from rendered preview images |

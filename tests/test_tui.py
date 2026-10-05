@@ -213,6 +213,7 @@ def test_replay_run_uses_persisted_generation_settings(monkeypatch, tmp_path: Pa
                         "max_ai_usd": 0.2,
                         "think": True,
                         "dry_run": True,
+                        "visual_review": False,
                     },
                 )
             ]

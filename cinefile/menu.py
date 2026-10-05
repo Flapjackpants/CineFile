@@ -234,6 +234,7 @@ def run_menu(
     kwargs.setdefault("max_ai_usd", 0.05)
     kwargs.setdefault("think", False)
     kwargs.setdefault("dry_run", False)
+    kwargs.setdefault("visual_review", False)
 
     while True:
         _header(settings)

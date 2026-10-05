@@ -15,6 +15,7 @@ MAGIC = 0xD780E884
 ACTION_NEXT_TICK = "flashback:action/next_tick"
 ACTION_MOVE = "flashback:action/move_entities"
 ACTION_CREATE_LOCAL = "flashback:action/create_local_player"
+ACTION_CHUNK_CACHED = "flashback:action/level_chunk_cached"
 
 
 @dataclass
@@ -46,6 +47,7 @@ class Trajectory:
     meta: ReplayMeta
     poses: Dict[int, Pose] = field(default_factory=dict)
     cuts: List[int] = field(default_factory=list)  # tick indices where a cut starts
+    chunk_refs: List[Tuple[int, int]] = field(default_factory=list)  # (tick, chunk cache record index)
 
     def sample(self, tick: int) -> Optional[Pose]:
         if tick in self.poses:
@@ -147,6 +149,8 @@ def _parse_chunk(
             player_id, last_player = _ingest_moves(
                 payload, tick, player_id, last_player, traj
             )
+        elif name == ACTION_CHUNK_CACHED:
+            _ingest_chunk_ref(payload, tick, traj)
     r.i = snap_end
 
     while r.remaining() > 0:
@@ -168,7 +172,16 @@ def _parse_chunk(
             player_id, last_player = _ingest_moves(
                 payload, tick, player_id, last_player, traj
             )
+        elif name == ACTION_CHUNK_CACHED:
+            _ingest_chunk_ref(payload, tick, traj)
     return tick, player_id, last_player
+
+
+def _ingest_chunk_ref(payload: bytes, tick: int, traj: Trajectory) -> None:
+    try:
+        traj.chunk_refs.append((tick, ByteReader(payload).read_varint()))
+    except EOFError:
+        pass
 
 
 def _parse_create_local(payload: bytes) -> Optional[Pose]:
