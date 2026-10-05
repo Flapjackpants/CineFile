@@ -23,8 +23,7 @@ from textual.widgets import (
 
 from .menu import list_replay_zips
 from .pipeline import RunResult, run
-from .editor import normalize_editor_dir
-from .settings import Settings, load_settings, normalize_input_dir, normalize_output_dir, save_settings, settings_from_dict
+from .settings import Settings, load_settings, normalize_input_dir, save_settings, settings_from_dict
 from .vim_buffer import VimBuffer
 
 
@@ -162,10 +161,9 @@ class ReplayScreen(ShellScreen):
 
     @work(exclusive=True)
     async def _start_run(self, replay: Path, options: dict[str, Any], result_screen: "ResultScreen") -> None:
-        output_path = self.app.settings.output_path
         editor_dir = self.app.editor_dir
-        if editor_dir is None and output_path:
-            editor_dir = normalize_editor_dir(Path(output_path).expanduser())
+        if editor_dir is None:
+            editor_dir = self.app.settings.render_dir()
         try:
             result = await asyncio.to_thread(run, replay, editor_dir=editor_dir, **options)
             await asyncio.sleep(0.01)
@@ -267,6 +265,8 @@ class ResultScreen(ShellScreen):
                         f"Wrote: {self.result.editor_state_path}",
                         f"AI estimate: ${self.result.usage.estimate_usd():.4f}",
                     ]
+                    if self.result.merged:
+                        lines.append("Merged into existing editor state (existing keyframes kept)")
                     if self.result.offline:
                         lines.append("Mode: offline / heuristic")
                     lines.append("Reopen the replay in Flashback to load the new editor state.")
@@ -307,6 +307,8 @@ class ResultScreen(ShellScreen):
                 f"Wrote: {result.editor_state_path}",
                 f"AI estimate: ${result.usage.estimate_usd():.4f}",
             ]
+            if result.merged:
+                lines.append("Merged into existing editor state (existing keyframes kept)")
             if result.offline:
                 lines.append("Mode: offline / heuristic")
             lines.append("Reopen the replay in Flashback to load the new editor state.")

@@ -8,7 +8,14 @@ from typing import List, Optional
 
 from .ai import AiConfig, AiUsage, laya_available, plan_clips_deepseek, score_candidates_laya
 from .camera import CameraClip, candidate_windows, select_clips_greedy, synthesize_clip
-from .editor import backup_and_write, build_editor_state, resolve_editor_dir
+from .editor import (
+    backup_and_write,
+    build_editor_state,
+    load_existing_state,
+    merge_editor_state,
+    occupied_ranges,
+    resolve_editor_dir,
+)
 from .replay import parse_replay
 from .styles_loader import load_style
 
@@ -21,6 +28,7 @@ class RunResult:
     cuts: int
     usage: AiUsage
     offline: bool
+    merged: bool = False
 
 
 def run(
@@ -40,6 +48,9 @@ def run(
 ) -> RunResult:
     style = load_style(style_id)
     traj = parse_replay(replay)
+    ed_dir = resolve_editor_dir(replay, editor_dir)
+    existing = load_existing_state(ed_dir, traj.meta.uuid)
+    occupied = occupied_ranges(existing) if existing is not None else []
     clip_ticks = max(20, int(round(clip_length_s * 20)))
     target_ticks = max(clip_ticks, int(round(duration_s * 20)))
     target_clips = max(1, target_ticks // clip_ticks)
@@ -51,6 +62,13 @@ def run(
         raise RuntimeError(
             "No valid clip windows found (replay too short or only teleport cuts)."
         )
+    if occupied:
+        cands = [
+            c for c in cands
+            if all(c[1] < a or c[0] > b for a, b in occupied)
+        ]
+        if not cands:
+            raise RuntimeError("No empty space left in existing editor state for new clips.")
 
     cfg = AiConfig(offline=offline, max_ai_usd=max_ai_usd, think=think)
     usage = AiUsage()
@@ -90,13 +108,21 @@ def run(
     if not clips:
         raise RuntimeError("Clip selection produced no cameras.")
 
-    ed_dir = resolve_editor_dir(replay, editor_dir)
-    state = build_editor_state(
-        clips,
-        replay_path=replay,
-        total_ticks=traj.meta.total_ticks,
-        fill_timelapse=timelapse,
-    )
+    if existing is not None:
+        state = merge_editor_state(
+            existing,
+            clips,
+            replay_path=replay,
+            total_ticks=traj.meta.total_ticks,
+            fill_timelapse=timelapse,
+        )
+    else:
+        state = build_editor_state(
+            clips,
+            replay_path=replay,
+            total_ticks=traj.meta.total_ticks,
+            fill_timelapse=timelapse,
+        )
 
     if dry_run:
         out = ed_dir / "editor_states" / f"{traj.meta.uuid}.json.dry_run"
@@ -114,4 +140,5 @@ def run(
         cuts=len(traj.cuts),
         usage=usage,
         offline=cfg.offline or not (cfg.deepseek_key or laya_available(cfg)),
+        merged=existing is not None,
     )

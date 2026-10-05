@@ -6,9 +6,10 @@ import json
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from .camera import CameraClip
+from .settings import normalize_render_instance_dir
 
 
 DEFAULT_VISUALS: Dict[str, Any] = {
@@ -73,6 +74,40 @@ def _timelapse_track(t0: int, t1: int) -> Dict[str, Any]:
     }
 
 
+def _camera_track(clip: CameraClip) -> Dict[str, Any]:
+    a, b = clip.keyframes
+    return {
+        "keyframeType": "CAMERA",
+        "keyframesByTick": {
+            str(a.tick): _camera_kf(a),
+            str(b.tick): _camera_kf(b),
+        },
+        "enabled": True,
+        "customColour": 0,
+    }
+
+
+def _overlaps(t0: int, t1: int, ranges: Sequence[Tuple[int, int]]) -> bool:
+    return any(not (t1 < a or t0 > b) for a, b in ranges)
+
+
+def _clip_tracks(
+    clips: Sequence[CameraClip],
+    *,
+    fill_timelapse: bool,
+    occupied: Sequence[Tuple[int, int]] = (),
+) -> List[Dict[str, Any]]:
+    tracks = [_camera_track(clip) for clip in clips]
+    if fill_timelapse and clips:
+        ordered = sorted(clips, key=lambda c: c.start_tick)
+        for i in range(len(ordered) - 1):
+            gap_start = ordered[i].end_tick
+            gap_end = ordered[i + 1].start_tick
+            if gap_end - gap_start >= 5 and not _overlaps(gap_start, gap_end, occupied):
+                tracks.append(_timelapse_track(gap_start, gap_end))
+    return tracks
+
+
 def build_editor_state(
     clips: Sequence[CameraClip],
     *,
@@ -111,28 +146,7 @@ def build_editor_state(
         state = json.loads(json.dumps(base))  # deep copy
         state["usedByPaths"] = [str(replay_path.resolve())]
 
-    tracks: List[Dict[str, Any]] = []
-    for clip in clips:
-        a, b = clip.keyframes
-        tracks.append(
-            {
-                "keyframeType": "CAMERA",
-                "keyframesByTick": {
-                    str(a.tick): _camera_kf(a),
-                    str(b.tick): _camera_kf(b),
-                },
-                "enabled": True,
-                "customColour": 0,
-            }
-        )
-
-    if fill_timelapse and clips:
-        ordered = sorted(clips, key=lambda c: c.start_tick)
-        for i in range(len(ordered) - 1):
-            gap_start = ordered[i].end_tick
-            gap_end = ordered[i + 1].start_tick
-            if gap_end - gap_start >= 5:
-                tracks.append(_timelapse_track(gap_start, gap_end))
+    tracks = _clip_tracks(clips, fill_timelapse=fill_timelapse)
 
     export_start = min(c.start_tick for c in clips) if clips else 0
     export_end = max(c.end_tick for c in clips) if clips else max(0, total_ticks - 1)
@@ -151,11 +165,8 @@ def build_editor_state(
 
 
 def normalize_editor_dir(path: Path) -> Path:
-    """Accept …/flashback or …/editor_states; return the Flashback data dir."""
-    p = path.expanduser().resolve()
-    if p.name == "editor_states":
-        return p.parent
-    return p
+    """Accept an instance root, …/flashback or …/editor_states; return the Flashback data dir."""
+    return normalize_render_instance_dir(path)
 
 
 def resolve_editor_dir(replay_path: Path, editor_dir: Optional[Path]) -> Path:
@@ -172,6 +183,91 @@ def resolve_editor_dir(replay_path: Path, editor_dir: Optional[Path]) -> Path:
         "Could not auto-detect Flashback data dir. Pass --editor-dir "
         "pointing at the instance's flashback/ folder."
     )
+
+
+def load_existing_state(editor_dir: Path, replay_uuid: str) -> Optional[Dict[str, Any]]:
+    """Return the saved editor state for a replay, or None when there is none."""
+    path = editor_dir / "editor_states" / f"{replay_uuid}.json"
+    if not path.exists():
+        return None
+    try:
+        state = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Existing editor state is unreadable, refusing to overwrite: {path} ({exc})") from exc
+    if not isinstance(state, dict):
+        raise ValueError(f"Existing editor state is not a JSON object, refusing to overwrite: {path}")
+    return state
+
+
+def _active_scene(state: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    scenes = state.get("scenes")
+    if not isinstance(scenes, list) or not scenes:
+        return None
+    index = state.get("sceneIndex", 0)
+    if not isinstance(index, int) or not 0 <= index < len(scenes):
+        index = 0
+    scene = scenes[index]
+    return scene if isinstance(scene, dict) else None
+
+
+def occupied_ranges(state: Dict[str, Any]) -> List[Tuple[int, int]]:
+    """Tick ranges already covered by keyframe tracks in the active scene."""
+    scene = _active_scene(state)
+    if scene is None:
+        return []
+    ranges: List[Tuple[int, int]] = []
+    for track in scene.get("keyframeTracks") or []:
+        ticks = [int(t) for t in (track.get("keyframesByTick") or {}) if str(t).lstrip("-").isdigit()]
+        if ticks:
+            ranges.append((min(ticks), max(ticks)))
+    return sorted(ranges)
+
+
+def merge_editor_state(
+    base: Dict[str, Any],
+    clips: Sequence[CameraClip],
+    *,
+    replay_path: Path,
+    total_ticks: int,
+    fill_timelapse: bool = False,
+) -> Dict[str, Any]:
+    """Append new tracks to an existing state without touching its keyframes."""
+    if not clips:
+        raise ValueError("No clips to merge into the existing editor state.")
+    state = json.loads(json.dumps(base))  # deep copy
+    occupied = occupied_ranges(state)
+    for clip in clips:
+        if _overlaps(clip.start_tick, clip.end_tick, occupied):
+            raise ValueError(f"Clip {clip.start_tick}-{clip.end_tick} overlaps existing keyframes.")
+
+    used = state.get("usedByPaths")
+    replay_str = str(replay_path.resolve())
+    if not isinstance(used, list):
+        state["usedByPaths"] = [replay_str]
+    elif replay_str not in used:
+        used.append(replay_str)
+
+    scene = _active_scene(state)
+    if scene is None:
+        fresh = build_editor_state(
+            clips,
+            replay_path=replay_path,
+            total_ticks=total_ticks,
+            fill_timelapse=fill_timelapse,
+        )
+        state["scenes"] = fresh["scenes"]
+        state["sceneIndex"] = 0
+        return state
+
+    tracks = scene.setdefault("keyframeTracks", [])
+    tracks.extend(_clip_tracks(clips, fill_timelapse=fill_timelapse, occupied=occupied))
+    new_start = min(c.start_tick for c in clips)
+    new_end = max(c.end_tick for c in clips)
+    old_start = scene.get("exportStartTicks")
+    old_end = scene.get("exportEndTicks")
+    scene["exportStartTicks"] = min(old_start, new_start) if isinstance(old_start, int) else new_start
+    scene["exportEndTicks"] = max(old_end, new_end) if isinstance(old_end, int) else new_end
+    return state
 
 
 def backup_and_write(state: Dict[str, Any], editor_dir: Path, replay_uuid: str) -> Path:

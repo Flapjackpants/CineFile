@@ -22,7 +22,7 @@ Opens the interactive terminal UI. Use the keyboard to select a replay, open **S
 - `i` enters insert mode; Escape returns to normal mode; use `h/j/k/l` or the arrow keys to move.
 - `:w` saves and stays, `:wq` saves and returns, and `:q` returns without saving.
 
-The settings object includes `input_path`, `output_path`, `clip_length_s`, `style_id`, `duration_s`, `project`, `timelapse`, `offline`, `max_ai_usd`, `think`, and `dry_run`. Paths accept a string or `null`; generation fields use the same defaults as the CLI. Older settings files containing only paths continue to work.
+The settings object includes `input_path`, `render_instance_path`, `clip_length_s`, `style_id`, `duration_s`, `project`, `timelapse`, `offline`, `max_ai_usd`, `think`, and `dry_run`. Paths accept a string or `null`; generation fields use the same defaults as the CLI. Older settings files containing only paths continue to work, and a legacy `output_path` is migrated to `render_instance_path`.
 
 Paths are saved to `~/.config/cinefile/settings.json` (or `$XDG_CONFIG_HOME/cinefile/settings.json`).
 
@@ -41,9 +41,17 @@ cinefile \
   --offline
 ```
 
-CLI option flags override their saved settings values. If `--editor-dir` is omitted, a saved **output path** from settings is used when present; otherwise the editor dir is inferred from the replay path.
+CLI option flags override their saved settings values. If `--editor-dir` is omitted, the saved **render instance** from settings is used when present; otherwise the editor dir is inferred from the replay path.
+
+Use `-o/--render-instance` (alias `--output`) to prefill the render instance path and open Settings.
 
 Then **close and reopen** the replay in Flashback so it reloads `editor_states/{uuid}.json`.
+
+### Render instance
+
+Set `render_instance_path` to the one Minecraft instance you render all flashbacks in, so mods and texture packs stay the same for every recording. It accepts the instance root, its `flashback/` folder, or `flashback/editor_states/`. CineFile writes editor states into that instance's `flashback/editor_states/`. Copy the replay zip into the instance's `flashback/replays/` so Flashback can open it there.
+
+If an editor state for the replay already exists, CineFile never overwrites or removes its keyframes. It keeps every existing track and adds new camera clips only in tick ranges with no keyframes. Timelapse gaps are added only where they do not cross existing keyframes. The previous file is backed up to `editor_backups/`. If no empty space is left, the run fails and nothing is written.
 
 ### Styles
 
@@ -80,5 +88,5 @@ Laya is free; `--max-ai-usd 0.05` caps DeepSeek spend (typically a few cents per
 | `--clip-length` | Seconds per shot |
 | `--duration` | Target total cinematic seconds |
 | `--timelapse` | Fill gaps with 1s (`0→20` tick) timelapse tracks |
-| `--editor-dir` | Instance `flashback/` folder (overrides settings output path) |
+| `--editor-dir` | Instance root or `flashback/` folder (overrides settings render instance) |
 | `--dry-run` | Write `*.json.dry_run` instead of replacing state |

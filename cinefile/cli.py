@@ -39,10 +39,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "-o",
+        "--render-instance",
         "--output",
+        dest="render_instance",
         type=Path,
         default=None,
-        help="Prefill the output path in Settings and open the Settings page",
+        help="Prefill the render instance path in Settings and open the Settings page",
     )
     p.add_argument(
         "--clip-length",
@@ -77,7 +79,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--editor-dir",
         type=Path,
         default=None,
-        help="Flashback data dir (…/flashback). Default: settings output or sibling of replays/",
+        help="Flashback data dir or instance root. Default: settings render instance or sibling of replays/",
     )
     p.add_argument(
         "--offline",
@@ -118,6 +120,8 @@ def _print_result(result, style: str, offline_flag: bool) -> None:
     print(f"teleport cuts skipped: {result.cuts}")
     print(f"style:        {style}")
     print(f"wrote:        {result.editor_state_path}")
+    if result.merged:
+        print("merged:       into existing editor state (existing keyframes kept)")
     print(
         f"AI estimate:  ${result.usage.estimate_usd():.4f} "
         f"(ds in/out={result.usage.deepseek_in}/{result.usage.deepseek_out}, "
@@ -132,10 +136,7 @@ def _print_result(result, style: str, offline_flag: bool) -> None:
 def _resolve_editor_dir_arg(editor_dir: Path | None) -> Path | None:
     if editor_dir is not None:
         return normalize_editor_dir(editor_dir)
-    settings = load_settings()
-    if settings.output_path:
-        return normalize_editor_dir(Path(settings.output_path).expanduser())
-    return None
+    return load_settings().render_dir()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -177,7 +178,7 @@ def main(argv: list[str] | None = None) -> int:
             key: str(value)
             for key, value in {
                 "input_path": args.input,
-                "output_path": args.output,
+                "render_instance_path": args.render_instance,
             }.items()
             if value is not None
         }

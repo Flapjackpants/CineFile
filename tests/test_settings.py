@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from cinefile.editor import normalize_editor_dir, resolve_editor_dir
@@ -6,7 +7,7 @@ from cinefile.settings import (
     Settings,
     load_settings,
     normalize_input_dir,
-    normalize_output_dir,
+    normalize_render_instance_dir,
     save_settings,
     settings_from_dict,
 )
@@ -14,11 +15,11 @@ from cinefile.settings import (
 
 def test_settings_roundtrip(tmp_path: Path):
     cfg = tmp_path / "settings.json"
-    s = Settings(input_path="/tmp/in", output_path="/tmp/out")
+    s = Settings(input_path="/tmp/in", render_instance_path="/tmp/out")
     save_settings(s, cfg)
     loaded = load_settings(cfg)
     assert loaded.input_path == "/tmp/in"
-    assert loaded.output_path == "/tmp/out"
+    assert loaded.render_instance_path == "/tmp/out"
     assert loaded.clip_length_s == 10.0
     assert loaded.style_id == "locked-dolly"
 
@@ -26,7 +27,7 @@ def test_settings_roundtrip(tmp_path: Path):
 def test_settings_missing_file(tmp_path: Path):
     loaded = load_settings(tmp_path / "missing.json")
     assert loaded.input_path is None
-    assert loaded.output_path is None
+    assert loaded.render_instance_path is None
 
 
 def test_legacy_path_only_settings_load_with_generation_defaults(tmp_path: Path):
@@ -34,7 +35,7 @@ def test_legacy_path_only_settings_load_with_generation_defaults(tmp_path: Path)
     cfg.write_text('{"input_path": "/tmp/replays", "output_path": "/tmp/flashback"}')
     loaded = load_settings(cfg)
     assert loaded.input_path == "/tmp/replays"
-    assert loaded.output_path == "/tmp/flashback"
+    assert loaded.render_instance_path == "/tmp/flashback"
     assert loaded.run_options() == {
         "clip_length_s": 10.0,
         "style_id": "locked-dolly",
@@ -58,13 +59,15 @@ def test_settings_reject_invalid_values():
             raise AssertionError(f"accepted invalid {field}={value!r}")
 
 
-def test_normalize_output_editor_states(tmp_path: Path):
+def test_normalize_render_instance_dir(tmp_path: Path):
     flashback = tmp_path / "flashback"
     states = flashback / "editor_states"
     states.mkdir(parents=True)
-    assert normalize_output_dir(states) == flashback.resolve()
+    assert normalize_render_instance_dir(states) == flashback.resolve()
     assert normalize_editor_dir(states) == flashback.resolve()
-    assert normalize_output_dir(flashback) == flashback.resolve()
+    assert normalize_render_instance_dir(flashback) == flashback.resolve()
+    assert normalize_render_instance_dir(tmp_path) == flashback.resolve()
+    assert normalize_editor_dir(tmp_path) == flashback.resolve()
 
 
 def test_normalize_input_flashback_to_replays(tmp_path: Path):
@@ -94,3 +97,21 @@ def test_list_replay_zips(tmp_path: Path):
     found = list_replay_zips(tmp_path)
     names = {p.name for p in found}
     assert names == {"a.zip", "b.zip"}
+
+
+def test_legacy_output_path_migrates_and_saves_new_key(tmp_path: Path):
+    cfg = tmp_path / "settings.json"
+    cfg.write_text('{"output_path": "/tmp/flashback"}')
+    loaded = load_settings(cfg)
+    assert loaded.render_instance_path == "/tmp/flashback"
+    save_settings(loaded, cfg)
+    data = json.loads(cfg.read_text())
+    assert data["render_instance_path"] == "/tmp/flashback"
+    assert "output_path" not in data
+
+
+def test_settings_from_dict_prefers_render_instance_path(tmp_path: Path):
+    instance = tmp_path / "Render"
+    settings = settings_from_dict({"render_instance_path": str(instance), "output_path": "/ignored"})
+    assert settings.render_instance_path == str((instance / "flashback").resolve())
+    assert settings.render_dir() == (instance / "flashback").resolve()

@@ -38,7 +38,7 @@ def test_cli_path_overrides_open_settings_and_save_with_saved_fallback(monkeypat
 
     saved_settings = Settings(
         input_path=str(tmp_path / "saved-replays"),
-        output_path=str(tmp_path / "saved-flashback"),
+        render_instance_path=str(tmp_path / "saved-flashback"),
     )
     saved = []
     monkeypatch.setattr(tui, "load_settings", lambda: saved_settings)
@@ -54,14 +54,14 @@ def test_cli_path_overrides_open_settings_and_save_with_saved_fallback(monkeypat
             editor = app.screen.query_one("#editor", VimBuffer)
             data = json.loads(editor.get_text())
             assert data["input_path"] == str(input_path)
-            assert data["output_path"] == saved_settings.output_path
+            assert data["render_instance_path"] == saved_settings.render_instance_path
 
             app.screen.on_vim_buffer_command_submitted(VimBuffer.CommandSubmitted("wq"))
             await pilot.pause()
             assert isinstance(app.screen, ReplayScreen)
             assert len(saved) == 1
             assert saved[0].input_path == str(input_path.resolve())
-            assert saved[0].output_path == str((tmp_path / "saved-flashback").resolve())
+            assert saved[0].render_instance_path == str((tmp_path / "saved-flashback" / "flashback").resolve())
 
     asyncio.run(check())
 
@@ -81,7 +81,7 @@ def test_settings_json_editor_saves_and_closes(monkeypatch, tmp_path: Path):
             editor = app.screen.query_one("#editor", VimBuffer)
             data = vars(Settings(
                 input_path=str(tmp_path / "replays"),
-                output_path=str(tmp_path / "flashback"),
+                render_instance_path=str(tmp_path / "flashback"),
                 clip_length_s=12,
                 style_id="hero-low",
                 duration_s=90,
@@ -99,7 +99,7 @@ def test_settings_json_editor_saves_and_closes(monkeypatch, tmp_path: Path):
             assert app.settings.clip_length_s == 12
             assert app.settings.style_id == "hero-low"
             assert app.settings.input_path == str((tmp_path / "replays").resolve())
-            assert app.settings.output_path == str((tmp_path / "flashback").resolve())
+            assert app.settings.render_instance_path == str((tmp_path / "flashback").resolve())
             assert saved == [app.settings]
 
     asyncio.run(check())

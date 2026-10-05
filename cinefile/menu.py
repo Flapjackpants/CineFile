@@ -11,7 +11,7 @@ from .settings import (
     expand_user_path,
     load_settings,
     normalize_input_dir,
-    normalize_output_dir,
+    normalize_render_instance_dir,
     save_settings,
 )
 
@@ -56,7 +56,7 @@ def _header(settings: Settings) -> None:
     print()
     print("=== CineFile ===")
     print(f"  Input:  {_fmt_path(settings.input_path)}")
-    print(f"  Output: {_fmt_path(settings.output_path)}")
+    print(f"  Render: {_fmt_path(settings.render_instance_path)}")
 
 
 def list_replay_zips(input_dir: Path) -> list[Path]:
@@ -88,8 +88,8 @@ def _set_path(settings: Settings, field: str, label: str, config_path: Optional[
         path = normalize_input_dir(path)
         settings.input_path = str(path)
     else:
-        path = normalize_output_dir(path)
-        settings.output_path = str(path)
+        path = normalize_render_instance_dir(path)
+        settings.render_instance_path = str(path)
     if not path.exists():
         print(f"Warning: path does not exist yet: {path}")
     elif not path.is_dir():
@@ -103,13 +103,13 @@ def _settings_menu(settings: Settings, config_path: Optional[Path]) -> None:
         _set_path(settings, "input_path", "Flashback input", config_path)
         return None
 
-    def set_output() -> Optional[str]:
-        _set_path(settings, "output_path", "Flashback output", config_path)
+    def set_render() -> Optional[str]:
+        _set_path(settings, "render_instance_path", "render instance", config_path)
         return None
 
     def show() -> Optional[str]:
         print(f"  Input:  {_fmt_path(settings.input_path)}")
-        print(f"  Output: {_fmt_path(settings.output_path)}")
+        print(f"  Render: {_fmt_path(settings.render_instance_path)}")
         cfg = config_path
         if cfg is None:
             from .settings import default_config_path
@@ -124,10 +124,10 @@ def _settings_menu(settings: Settings, config_path: Optional[Path]) -> None:
         print("Cleared input path.")
         return None
 
-    def clear_output() -> Optional[str]:
-        settings.output_path = None
+    def clear_render() -> Optional[str]:
+        settings.render_instance_path = None
         save_settings(settings, config_path)
-        print("Cleared output path.")
+        print("Cleared render instance path.")
         return None
 
     def back() -> Optional[str]:
@@ -137,10 +137,10 @@ def _settings_menu(settings: Settings, config_path: Optional[Path]) -> None:
         "--- Settings ---",
         [
             ("Set Flashback input path", set_input),
-            ("Set Flashback output path", set_output),
+            ("Set render instance path", set_render),
             ("Show current paths", show),
             ("Clear input path", clear_input),
-            ("Clear output path", clear_output),
+            ("Clear render instance path", clear_render),
             ("Back", back),
         ],
     )
@@ -204,8 +204,8 @@ def _create_edits(settings: Settings, run_kwargs: RunKwargs) -> None:
     if replay is None:
         return
     editor_dir = None
-    if settings.output_path:
-        editor_dir = normalize_output_dir(Path(settings.output_path).expanduser())
+    if settings.render_instance_path:
+        editor_dir = normalize_render_instance_dir(Path(settings.render_instance_path))
     kwargs = dict(run_kwargs)
     kwargs["editor_dir"] = editor_dir
     try:

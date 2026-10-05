@@ -42,7 +42,7 @@ def test_no_replay_cli_flags_override_saved_settings(monkeypatch):
     assert received["settings_overrides"] == {}
 
 
-def test_input_and_output_path_flags_are_passed_to_tui(monkeypatch, tmp_path: Path):
+def test_input_and_legacy_output_flag_are_passed_to_tui(monkeypatch, tmp_path: Path):
     received = {}
 
     class FakeApp:
@@ -58,11 +58,11 @@ def test_input_and_output_path_flags_are_passed_to_tui(monkeypatch, tmp_path: Pa
     assert cli.main(["-i", str(input_path), "--output", str(output_path)]) == 0
     assert received["settings_overrides"] == {
         "input_path": str(input_path),
-        "output_path": str(output_path),
+        "render_instance_path": str(output_path),
     }
 
 
-def test_long_input_and_short_output_path_flags_are_passed_to_tui(monkeypatch, tmp_path: Path):
+def test_long_input_and_short_render_instance_flags_are_passed_to_tui(monkeypatch, tmp_path: Path):
     received = {}
 
     class FakeApp:
@@ -78,8 +78,24 @@ def test_long_input_and_short_output_path_flags_are_passed_to_tui(monkeypatch, t
     assert cli.main(["--input", str(input_path), "-o", str(output_path)]) == 0
     assert received["settings_overrides"] == {
         "input_path": str(input_path),
-        "output_path": str(output_path),
+        "render_instance_path": str(output_path),
     }
+
+
+def test_long_render_instance_flag_is_passed_to_tui(monkeypatch, tmp_path: Path):
+    received = {}
+
+    class FakeApp:
+        def __init__(self, *, run_options, editor_dir, settings_overrides):
+            received["settings_overrides"] = settings_overrides
+
+        def run(self):
+            return 0
+
+    monkeypatch.setattr("cinefile.tui.CineFileApp", FakeApp, raising=False)
+    instance = tmp_path / "Render"
+    assert cli.main(["--render-instance", str(instance)]) == 0
+    assert received["settings_overrides"] == {"render_instance_path": str(instance)}
 
 
 def test_direct_replay_cli_keeps_pipeline_path(monkeypatch, tmp_path: Path):
@@ -102,6 +118,7 @@ def test_direct_replay_cli_keeps_pipeline_path(monkeypatch, tmp_path: Path):
         editor_state_path = tmp_path / "state.json"
         usage = Usage()
         offline = True
+        merged = False
 
     def fake_run(path, **kwargs):
         called["path"] = path
