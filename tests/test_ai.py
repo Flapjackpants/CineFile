@@ -51,3 +51,30 @@ def test_laya_predict_error_falls_back_per_window(monkeypatch):
     monkeypatch.setattr(ai, "_load_laya", lambda model_id: Flaky())
     out = score_candidates_laya([(0, 100, 1.0)], project="", cfg=AiConfig(), usage=AiUsage())
     assert out == [(0, 100, 1.0)]
+
+
+def test_laya_appends_notes(monkeypatch):
+    agent = FakeAgent([1.0, 1.0])
+    monkeypatch.setattr(ai, "_load_laya", lambda model_id: agent)
+    score_candidates_laya(
+        [(0, 100, 1.0), (200, 300, 0.5)],
+        project="",
+        cfg=AiConfig(),
+        usage=AiUsage(),
+        notes=["note A", "note B"],
+    )
+    assert agent.texts[0].endswith(" note A")
+    assert agent.texts[1].endswith(" note B")
+
+
+def test_laya_notes_length_mismatch():
+    import pytest
+
+    with pytest.raises(ValueError, match="notes must match candidates"):
+        score_candidates_laya(
+            [(0, 100, 1.0)],
+            project="",
+            cfg=AiConfig(offline=True),
+            usage=AiUsage(),
+            notes=[],
+        )

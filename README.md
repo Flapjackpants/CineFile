@@ -106,6 +106,7 @@ cinefile --list-styles
 - `high-crane` — elevated overview
 - `side-track` — strong lateral tracking
 - `orbit-reveal` — gentle yaw arc across the shot
+- `auto` — builds every style per clip and keeps the best-framed one
 
 ### AI (optional)
 

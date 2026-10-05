@@ -123,3 +123,7 @@ def test_legacy_input_path_and_render_instance_path_migrate(tmp_path: Path):
     loaded = load_settings(cfg)
     assert loaded.input_flashback_folder == "/tmp/replays"
     assert loaded.output_flashback_folder == "/tmp/flashback"
+
+
+def test_settings_accept_auto_style():
+    assert settings_from_dict({"style_id": "auto"}).style_id == "auto"

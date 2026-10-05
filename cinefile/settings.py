@@ -9,7 +9,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Optional
 
-from .styles_loader import list_styles
+from .styles_loader import style_choices
 
 
 DEFAULT_RUN_OPTIONS: dict[str, Any] = {
@@ -89,8 +89,8 @@ def settings_from_dict(data: dict[str, Any], *, normalize_paths: bool = True) ->
     duration = _positive_number(data.get("duration_s", 180.0), "duration_s")
     max_ai_usd = _nonnegative_number(data.get("max_ai_usd", 0.05), "max_ai_usd")
     style = data.get("style_id", "locked-dolly")
-    if not isinstance(style, str) or style not in list_styles():
-        raise ValueError(f"style_id must be one of: {', '.join(list_styles())}")
+    if not isinstance(style, str) or style not in style_choices():
+        raise ValueError(f"style_id must be one of: {', '.join(style_choices())}")
     project = data.get("project", "")
     if not isinstance(project, str):
         raise ValueError("project must be a string")

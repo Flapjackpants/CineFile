@@ -6,6 +6,7 @@ import pytest
 
 from cinefile import pipeline
 from cinefile.camera import CameraClip, CameraKeyframe
+from cinefile.framing import FramingStats
 from cinefile.editor import (
     build_editor_state,
     load_existing_state,
@@ -92,7 +93,13 @@ def _fake_pipeline(monkeypatch, cands, seen):
     monkeypatch.setattr(pipeline, "score_candidates_laya", lambda c, **k: c)
     monkeypatch.setattr(pipeline, "plan_clips_deepseek", lambda *a, **k: [])
 
-    def greedy(candidates, traj, style, target_ticks, min_gap_ticks=0):
+    monkeypatch.setattr(
+        pipeline,
+        "best_clip",
+        lambda traj, t0, t1, styles: (_clip(t0, t1), FramingStats(1.0, 1.0, 0.0, 1.0)),
+    )
+
+    def greedy(candidates, traj, style, target_ticks, min_gap_ticks=0, synth=None):
         seen.extend(candidates)
         return [_clip(t0, t1) for t0, t1, _ in candidates]
 
@@ -111,7 +118,7 @@ def test_pipeline_fills_only_empty_space(monkeypatch, tmp_path: Path):
     result = pipeline.run(tmp_path / "replay.zip", editor_dir=tmp_path / "Render", offline=True)
 
     assert result.merged
-    assert [(t0, t1) for t0, t1, _ in seen] == [(0, 99), (500, 700)]
+    assert sorted((t0, t1) for t0, t1, _ in seen) == [(0, 99), (500, 700)]
     written = json.loads((states / "abc.json").read_text())
     tracks = written["scenes"][0]["keyframeTracks"]
     assert tracks[0] == existing["scenes"][0]["keyframeTracks"][0]

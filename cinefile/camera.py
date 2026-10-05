@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import List, Optional, Sequence, Tuple
+from typing import Callable, List, Optional, Sequence, Tuple
 
 from .replay import Pose, Trajectory, continuous_segments
 from .styles_loader import Style
@@ -28,6 +28,7 @@ class CameraClip:
     keyframes: Tuple[CameraKeyframe, CameraKeyframe]
     score: float = 0.0
     phase_hint: str = ""
+    style_id: str = ""
 
 
 def _wrap_degrees(deg: float) -> float:
@@ -165,7 +166,7 @@ def synthesize_clip(
 
     kf0 = CameraKeyframe(t0, x0, y0, z0, yaw0, pitch0)
     kf1 = CameraKeyframe(t1, x1, y1, z1, yaw1, pitch1)
-    return CameraClip(t0, t1, (kf0, kf1), score=score)
+    return CameraClip(t0, t1, (kf0, kf1), score=score, style_id=style.id)
 
 
 def select_clips_greedy(
@@ -174,6 +175,7 @@ def select_clips_greedy(
     style: Style,
     target_ticks: int,
     min_gap_ticks: int = 0,
+    synth: Optional[Callable[[int, int, float], Optional[CameraClip]]] = None,
 ) -> List[CameraClip]:
     """Pick non-overlapping high-score windows until duration budget filled."""
     picked: List[CameraClip] = []
@@ -184,7 +186,11 @@ def select_clips_greedy(
             break
         if any(not (t1 + min_gap_ticks < a or t0 - min_gap_ticks > b) for a, b in used):
             continue
-        clip = synthesize_clip(traj, t0, t1, style, score=score)
+        clip = (
+            synth(t0, t1, score)
+            if synth
+            else synthesize_clip(traj, t0, t1, style, score=score)
+        )
         if clip is None:
             continue
         picked.append(clip)

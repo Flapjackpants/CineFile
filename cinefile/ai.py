@@ -85,8 +85,11 @@ def score_candidates_laya(
     project: str,
     cfg: AiConfig,
     usage: AiUsage,
+    notes: Optional[Sequence[str]] = None,
 ) -> List[Tuple[int, int, float]]:
     """Re-score candidates with local Laya; falls back to heuristic scores."""
+    if notes is not None and len(notes) != len(candidates):
+        raise ValueError("notes must match candidates")
     if cfg.offline:
         return list(candidates)
     agent = _load_laya(cfg.laya_model)
@@ -95,13 +98,15 @@ def score_candidates_laya(
 
     # Laya has a 512-token context, so score one window per call (~20ms each)
     scored: List[Tuple[int, int, float]] = []
-    for t0, t1, heur in candidates:
+    for i, (t0, t1, heur) in enumerate(candidates):
         text = (
             f"Project: {project or 'minecraft building session'}. "
             f"Window {t0 / 20.0:.1f}s-{t1 / 20.0:.1f}s "
             f"({(t1 - t0) / 20.0:.1f}s). "
             f"Heuristic activity score {heur:.3f}."
         )
+        if notes is not None:
+            text += " " + notes[i]
         try:
             result = agent.predict(text, {"clip": _LAYA_QUESTION})
             usage.laya_calls += 1

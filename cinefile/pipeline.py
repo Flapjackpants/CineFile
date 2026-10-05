@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import List, Optional
 
 from .ai import AiConfig, AiUsage, laya_available, plan_clips_deepseek, score_candidates_laya
-from .camera import CameraClip, candidate_windows, select_clips_greedy, synthesize_clip
+from .camera import CameraClip, candidate_windows, select_clips_greedy
 from .editor import (
     backup_and_write,
     build_editor_state,
@@ -16,8 +16,9 @@ from .editor import (
     occupied_ranges,
     resolve_editor_dir,
 )
+from .framing import best_clip, framing_multiplier, framing_note
 from .replay import parse_replay
-from .styles_loader import load_style
+from .styles_loader import resolve_styles
 
 
 @dataclass
@@ -46,7 +47,7 @@ def run(
     dry_run: bool = False,
     max_candidates: int = 500,
 ) -> RunResult:
-    style = load_style(style_id)
+    styles = resolve_styles(style_id)
     traj = parse_replay(replay)
     ed_dir = resolve_editor_dir(replay, editor_dir)
     existing = load_existing_state(ed_dir, traj.meta.uuid)
@@ -72,9 +73,33 @@ def run(
 
     cfg = AiConfig(offline=offline, max_ai_usd=max_ai_usd, think=think)
     usage = AiUsage()
+    best = {}
+    for t0, t1, _ in cands:
+        r = best_clip(traj, t0, t1, styles)
+        if r:
+            best[(t0, t1)] = r
+    cands = [c for c in cands if (c[0], c[1]) in best]
+    if not cands:
+        raise RuntimeError("No candidate window produced a camera.")
+    notes = [
+        framing_note(best[(t0, t1)][1], best[(t0, t1)][0].style_id)
+        for t0, t1, _ in cands
+    ]
     cands = score_candidates_laya(
-        cands, project=project, cfg=cfg, usage=usage
+        cands, project=project, cfg=cfg, usage=usage, notes=notes
     )
+    cands = sorted(
+        (
+            (t0, t1, s * framing_multiplier(best[(t0, t1)][1]))
+            for t0, t1, s in cands
+        ),
+        key=lambda c: c[2],
+        reverse=True,
+    )
+
+    def synth(t0, t1, score):
+        r = best.get((t0, t1))
+        return replace(r[0], score=score) if r else None
 
     indices = plan_clips_deepseek(
         cands,
@@ -93,7 +118,7 @@ def run(
             t0, t1, score = cands[idx]
             if any(not (t1 < a or t0 > b) for a, b in used_ranges):
                 continue
-            clip = synthesize_clip(traj, t0, t1, style, score=score)
+            clip = synth(t0, t1, score)
             if clip:
                 clips.append(clip)
                 used_ranges.append((t0, t1))
@@ -102,7 +127,12 @@ def run(
         clips.sort(key=lambda c: c.start_tick)
     else:
         clips = select_clips_greedy(
-            cands, traj, style, target_ticks=target_ticks, min_gap_ticks=0
+            cands,
+            traj,
+            styles[0],
+            target_ticks=target_ticks,
+            min_gap_ticks=0,
+            synth=synth,
         )
 
     if not clips:

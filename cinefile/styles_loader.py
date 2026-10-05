@@ -8,6 +8,8 @@ from typing import Dict, List
 
 import yaml
 
+AUTO_STYLE_ID = "auto"
+
 
 @dataclass
 class Style:
@@ -51,5 +53,17 @@ def load_style(style_id: str) -> Style:
     )
 
 
+def style_choices() -> List[str]:
+    return list_styles() + [AUTO_STYLE_ID]
+
+
+def resolve_styles(style_id: str) -> List[Style]:
+    if style_id == AUTO_STYLE_ID:
+        return [load_style(s) for s in list_styles()]
+    return [load_style(style_id)]
+
+
 def styles_as_dict() -> Dict[str, str]:
-    return {s: load_style(s).description for s in list_styles()}
+    out = {s: load_style(s).description for s in list_styles()}
+    out[AUTO_STYLE_ID] = "Try every style for each clip and keep the best-framed one."
+    return out

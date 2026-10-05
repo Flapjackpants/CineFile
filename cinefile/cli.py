@@ -10,11 +10,11 @@ from . import __version__
 from .editor import normalize_editor_dir
 from .pipeline import run
 from .settings import load_settings
-from .styles_loader import list_styles, styles_as_dict
+from .styles_loader import style_choices, styles_as_dict
 
 
 def build_parser() -> argparse.ArgumentParser:
-    styles = list_styles()
+    styles = style_choices()
     p = argparse.ArgumentParser(
         prog="cinefile",
         description=(

@@ -131,3 +131,7 @@ def test_direct_replay_cli_keeps_pipeline_path(monkeypatch, tmp_path: Path):
     assert called["path"] == replay
     assert called["kwargs"]["offline"] is True
     assert called["kwargs"]["duration_s"] == 60.0
+
+
+def test_style_auto_flag():
+    assert cli.build_parser().parse_args(["--style", "auto"]).style == "auto"
