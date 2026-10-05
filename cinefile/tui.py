@@ -188,7 +188,7 @@ class SettingsScreen(ShellScreen):
         with Vertical():
             yield Header(show_clock=True)
             yield Static("", id="title-art")
-            yield Label("Settings — edit JSON; i insert, Escape normal, :w save, :wq save/back, :q discard")
+            yield Label("Settings — edit JSON; i insert, p/Cmd+V paste, Escape normal, :w save, :wq save/back, :q discard")
             with Vertical(id="editor-wrap"):
                 yield VimBuffer(self._initial_text(), id="editor")
             yield Static("-- NORMAL --", id="mode-bar")

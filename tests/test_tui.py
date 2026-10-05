@@ -2,11 +2,13 @@ import asyncio
 import json
 from pathlib import Path
 
+from textual import events
+
 from cinefile.ai import AiUsage
 from cinefile.pipeline import RunResult
 from cinefile.settings import Settings
 from cinefile.tui import CineFileApp, ReplayScreen, ResultScreen, SettingsScreen
-from cinefile.vim_buffer import VimBuffer, VimBufferModel
+from cinefile.vim_buffer import PUT_REQUEST, EditorMode, VimBuffer, VimBufferModel
 
 
 def test_replay_browser_lists_zips_and_has_no_buttons(tmp_path: Path):
@@ -229,3 +231,124 @@ def test_vim_buffer_supports_insert_navigation_and_commands():
     model.handle_key("colon")
     model.handle_key("w", "w")
     assert model.handle_key("enter") == "w"
+
+
+def _model(text: str, col: int, mode: EditorMode, row: int = 0) -> VimBufferModel:
+    model = VimBufferModel(text)
+    model.mode = mode
+    model.row = row
+    model.col = col
+    return model
+
+
+def test_paste_text_insert_single_line():
+    model = _model("ab", 1, EditorMode.INSERT)
+    model.paste_text("XY")
+    assert model.get_text() == "aXYb"
+    assert model.col == 3
+
+
+def test_paste_text_insert_multi_line():
+    model = _model("ab", 1, EditorMode.INSERT)
+    model.paste_text("X\nY")
+    assert model.lines == ["aX", "Yb"]
+    assert (model.row, model.col) == (1, 1)
+
+
+def test_paste_normalizes_text():
+    model = _model("", 0, EditorMode.INSERT)
+    model.paste_text("a\r\nb\tc\x07")
+    assert model.get_text() == "a\nb    c"
+
+
+def test_paste_text_ignored_outside_insert():
+    model = _model("ab", 0, EditorMode.NORMAL)
+    model.paste_text("XY")
+    assert model.get_text() == "ab"
+
+
+def test_normal_p_returns_put_request():
+    model = VimBufferModel("ab")
+    assert model.handle_key("p", "p") == PUT_REQUEST
+    assert model.get_text() == "ab"
+
+
+def test_put_after_charwise():
+    model = _model("ab", 0, EditorMode.NORMAL)
+    model.put_after("XY")
+    assert model.get_text() == "aXYb"
+    assert model.col == 2
+
+
+def test_put_after_empty_line():
+    model = _model("", 0, EditorMode.NORMAL)
+    model.put_after("XY")
+    assert model.get_text() == "XY"
+    assert model.col == 1
+
+
+def test_put_after_linewise():
+    model = _model("a\nb", 0, EditorMode.NORMAL)
+    model.put_after("  x\ny\n")
+    assert model.lines == ["a", "  x", "y", "b"]
+    assert (model.row, model.col) == (1, 2)
+
+
+def test_put_after_empty_noop():
+    model = _model("ab", 0, EditorMode.NORMAL)
+    model.put_after("")
+    assert model.get_text() == "ab"
+    assert model.col == 0
+
+
+def test_settings_editor_handles_paste_event(monkeypatch, tmp_path: Path):
+    from cinefile import tui
+
+    monkeypatch.setattr(tui, "load_settings", lambda: Settings())
+    monkeypatch.setattr(tui, "save_settings", lambda settings: None)
+    app = CineFileApp(settings_overrides={"input_path": str(tmp_path)})
+
+    async def check():
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            editor = app.screen.query_one("#editor", VimBuffer)
+            await pilot.press("i")
+            editor.on_paste(events.Paste("Z"))
+            assert editor.get_text().startswith("Z")
+
+    asyncio.run(check())
+
+
+def test_settings_editor_p_puts_clipboard(monkeypatch, tmp_path: Path):
+    from cinefile import tui, vim_buffer
+
+    monkeypatch.setattr(tui, "load_settings", lambda: Settings())
+    monkeypatch.setattr(vim_buffer, "read_system_clipboard", lambda: "Q")
+    app = CineFileApp(settings_overrides={"input_path": str(tmp_path)})
+
+    async def check():
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            editor = app.screen.query_one("#editor", VimBuffer)
+            await pilot.press("p")
+            assert editor.get_text().split("\n")[0] == "{Q"
+
+    asyncio.run(check())
+
+
+def test_settings_editor_p_empty_clipboard(monkeypatch, tmp_path: Path):
+    from cinefile import tui, vim_buffer
+
+    monkeypatch.setattr(tui, "load_settings", lambda: Settings())
+    monkeypatch.setattr(vim_buffer, "read_system_clipboard", lambda: None)
+    app = CineFileApp(settings_overrides={"input_path": str(tmp_path)})
+
+    async def check():
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            editor = app.screen.query_one("#editor", VimBuffer)
+            before = editor.get_text()
+            await pilot.press("p")
+            assert editor.get_text() == before
+
+    asyncio.run(check())

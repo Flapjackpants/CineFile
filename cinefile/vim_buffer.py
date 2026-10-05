@@ -2,12 +2,31 @@
 
 from __future__ import annotations
 
+import subprocess
 from enum import Enum
 from rich.text import Text
 from textual import events
 from textual.message import Message
 from textual.reactive import reactive
 from textual.widget import Widget
+
+
+PUT_REQUEST = "\x00put"
+
+
+def _normalize_paste(text: str) -> str:
+    text = text.replace("\r\n", "\n").replace("\r", "\n").replace("\t", "    ")
+    return "".join(ch for ch in text if ch == "\n" or ch.isprintable())
+
+
+def read_system_clipboard() -> str | None:
+    try:
+        result = subprocess.run(
+            ["pbpaste"], capture_output=True, text=True, timeout=1, check=False
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return None
+    return result.stdout if result.returncode == 0 else None
 
 
 class EditorMode(str, Enum):
@@ -117,6 +136,45 @@ class VimBufferModel:
         self.row += 1
         self.col = 0
 
+    def _splice(self, text: str, at_col: int) -> None:
+        line = self.lines[self.row]
+        left, right = line[:at_col], line[at_col:]
+        parts = text.split("\n")
+        if len(parts) == 1:
+            self.lines[self.row] = left + parts[0] + right
+            self.col = len(left) + len(parts[0])
+            return
+        new = [left + parts[0], *parts[1:-1], parts[-1] + right]
+        self.lines[self.row : self.row + 1] = new
+        self.row += len(parts) - 1
+        self.col = len(parts[-1])
+
+    def paste_text(self, text: str) -> None:
+        if self.mode != EditorMode.INSERT:
+            return
+        text = _normalize_paste(text)
+        if not text:
+            return
+        self._splice(text, self.col)
+
+    def put_after(self, text: str) -> None:
+        if self.mode != EditorMode.NORMAL:
+            return
+        text = _normalize_paste(text)
+        if not text:
+            return
+        if text.endswith("\n"):
+            new = text[:-1].split("\n")
+            self.lines[self.row + 1 : self.row + 1] = new
+            self.row += 1
+            line = self.lines[self.row]
+            self.col = len(line) - len(line.lstrip())
+        else:
+            at = 0 if not self.lines[self.row] else self.col + 1
+            self._splice(text, at)
+            self.col = max(0, self.col - 1)
+        self._clamp_cursor()
+
     def handle_key(self, key: str, character: str | None = None) -> str | None:
         """Handle a key. Returns a completed ex-command (without leading ':') or None."""
         if self.mode == EditorMode.COMMAND:
@@ -136,6 +194,8 @@ class VimBufferModel:
             self.enter_insert()
         elif key in ("colon", ":"):
             self.enter_command()
+        elif key == "p":
+            return PUT_REQUEST
         elif key in ("h", "left"):
             self.move_left()
         elif key in ("l", "right"):
@@ -259,10 +319,24 @@ class VimBuffer(Widget):
         if character == ":" and self.model.mode == EditorMode.NORMAL:
             key = "colon"
         cmd = self.model.handle_key(key, character)
+        if cmd == PUT_REQUEST:
+            text = read_system_clipboard() or self.app.clipboard
+            if text:
+                self.model.put_after(text)
+            else:
+                self.app.notify("Clipboard is empty", severity="warning")
+            cmd = None
         self._sync_status()
         self.refresh()
         if cmd is not None:
             self.post_message(self.CommandSubmitted(cmd))
+
+    def on_paste(self, event: events.Paste) -> None:
+        event.stop()
+        if self.model.mode == EditorMode.INSERT:
+            self.model.paste_text(event.text)
+            self._sync_status()
+            self.refresh()
 
     def watch_mode_label(self, value: str) -> None:
         # reactive hook keeps Textual happy; status is pushed via ModeChanged
