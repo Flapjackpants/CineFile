@@ -26,6 +26,7 @@ Opens the terminal UI.
 - `s` open Settings.
 - `q` quit.
 - On the result screen, `Enter` or `Escape` goes back to the menu.
+- While a run is in progress, the result screen shows a live ASCII view of the camera being scored.
 
 **Editing settings**
 
@@ -94,6 +95,8 @@ cinefile \
 ```
 
 Command-line flags override the saved settings.
+
+- `--no-view`: the live ASCII view of the camera being scored is drawn on stderr only when stderr is a terminal; `--no-view` turns it off.
 
 If you omit `--editor-dir`, CineFile uses the saved `output_flashback_folder`. If that is not set, it infers the editor folder from the replay path.
 

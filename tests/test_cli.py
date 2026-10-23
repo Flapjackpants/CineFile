@@ -1,3 +1,4 @@
+import io
 from pathlib import Path
 
 from cinefile import cli
@@ -143,3 +144,54 @@ def test_visual_review_flag():
 
 def test_tries_flag():
     assert cli.build_parser().parse_args(["--tries", "20"]).tries == 20
+
+
+class _TtyStringIO(io.StringIO):
+    def isatty(self):
+        return True
+
+
+def _run_capture(monkeypatch, tmp_path, extra_args):
+    replay = tmp_path / "replay.zip"
+    replay.write_bytes(b"zip")
+    called = {}
+
+    class Usage:
+        deepseek_in = 0
+        deepseek_out = 0
+        laya_calls = 0
+
+        def estimate_usd(self):
+            return 0
+
+    class Result:
+        replay_uuid = "uuid"
+        clips = []
+        cuts = 0
+        editor_state_path = tmp_path / "state.json"
+        usage = Usage()
+        offline = True
+        merged = False
+
+    def fake_run(path, **kwargs):
+        called.update(kwargs)
+        return Result()
+
+    monkeypatch.setattr(cli, "run", fake_run)
+    monkeypatch.setattr(cli, "_resolve_editor_dir_arg", lambda value: None)
+    assert cli.main(["--replay", str(replay), "--offline", *extra_args]) == 0
+    return called
+
+
+def test_no_view_flag():
+    assert cli.build_parser().parse_args(["--no-view"]).no_view is True
+
+
+def test_no_view_when_stderr_not_tty(monkeypatch, tmp_path):
+    assert "on_score" not in _run_capture(monkeypatch, tmp_path, [])
+
+
+def test_view_on_tty_and_no_view_flag(monkeypatch, tmp_path):
+    monkeypatch.setattr(cli.sys, "stderr", _TtyStringIO())
+    assert callable(_run_capture(monkeypatch, tmp_path, [])["on_score"])
+    assert "on_score" not in _run_capture(monkeypatch, tmp_path, ["--no-view"])

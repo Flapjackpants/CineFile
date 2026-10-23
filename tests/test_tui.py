@@ -180,6 +180,8 @@ def test_replay_run_uses_persisted_generation_settings(monkeypatch, tmp_path: Pa
     calls = []
 
     def fake_run(path, **kwargs):
+        kwargs = dict(kwargs)
+        assert callable(kwargs.pop("on_score"))
         calls.append((path, kwargs))
         return RunResult(
             replay_uuid="uuid",
@@ -352,5 +354,28 @@ def test_settings_editor_p_empty_clipboard(monkeypatch, tmp_path: Path):
             before = editor.get_text()
             await pilot.press("p")
             assert editor.get_text() == before
+
+    asyncio.run(check())
+
+
+def test_result_screen_score_view():
+    app = CineFileApp()
+
+    async def check():
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen = ResultScreen(Path("r.zip"), running=True)
+            app.push_screen(screen)
+            await pilot.pause()
+            screen.show_frame("ab\ncd")
+            await pilot.pause()
+            view = screen.query_one("#score-view")
+            assert "ab" in view.render().plain
+            screen.show_result(error="boom")
+            await pilot.pause()
+            assert view.display is False
+            screen.show_frame("zz")
+            await pilot.pause()
+            assert "zz" not in view.render().plain
 
     asyncio.run(check())

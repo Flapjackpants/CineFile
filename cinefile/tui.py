@@ -21,6 +21,7 @@ from textual.widgets import (
     Static,
 )
 
+from .ascii_view import ScoreViewer
 from .menu import list_replay_zips
 from .pipeline import RunResult, run
 from .settings import Settings, load_settings, normalize_input_flashback_folder, save_settings, settings_from_dict
@@ -57,6 +58,7 @@ class CineFileApp(App[int]):
         padding: 1 2;
         margin: 1 0;
     }
+    #score-view { height: auto; padding: 0 2; }
     """
 
     def __init__(
@@ -164,8 +166,11 @@ class ReplayScreen(ShellScreen):
         editor_dir = self.app.editor_dir
         if editor_dir is None:
             editor_dir = self.app.settings.render_dir()
+        viewer = ScoreViewer(lambda text: self.app.call_from_thread(result_screen.show_frame, text))
         try:
-            result = await asyncio.to_thread(run, replay, editor_dir=editor_dir, **options)
+            result = await asyncio.to_thread(
+                run, replay, editor_dir=editor_dir, on_score=viewer, **options
+            )
             await asyncio.sleep(0.01)
             result_screen.show_result(result=result, style=options["style_id"])
         except Exception as exc:
@@ -252,6 +257,7 @@ class ResultScreen(ShellScreen):
                 if self.running:
                     yield Label("Generating Flashback camera edits…", id="result-title")
                     yield Static(f"Replay: {self.replay}\nThis can take a little while.", id="result-box")
+                    yield Static("", id="score-view", markup=False)
                 elif self.error:
                     yield Label("Generation failed", id="result-title", classes="error")
                     yield Static(self.error, id="result-box")
@@ -282,6 +288,12 @@ class ResultScreen(ShellScreen):
 
     def action_quit(self) -> None:
         self.app.exit(0)
+
+    def show_frame(self, text: str) -> None:
+        if not self.running:
+            return
+        for w in self.query("#score-view"):
+            w.update(text)
 
     def show_result(
         self,
@@ -316,5 +328,7 @@ class ResultScreen(ShellScreen):
             details = "\n".join(lines)
         else:
             return
+        for w in self.query("#score-view"):
+            w.display = False
         self.query_one("#result-title", Label).update(title)
         self.query_one("#result-box", Static).update(details)

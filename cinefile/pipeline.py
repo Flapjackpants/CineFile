@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 from .ai import (
     AiConfig,
@@ -23,7 +23,7 @@ from .editor import (
     occupied_ranges,
     resolve_editor_dir,
 )
-from .framing import best_clip, framing_multiplier, framing_note
+from .framing import ScoreEvent, best_clip, framing_multiplier, framing_note
 from .preview import clip_previews
 from .replay import parse_replay
 from .styles_loader import resolve_styles, tries_per_style
@@ -59,6 +59,7 @@ def run(
     visual_review: bool = False,
     tries: int = 1,
     max_candidates: int = 500,
+    on_score: Optional[Callable[[ScoreEvent], None]] = None,
 ) -> RunResult:
     styles = resolve_styles(style_id)
     per_style = tries_per_style(tries, len(styles))
@@ -91,8 +92,16 @@ def run(
     )
     usage = AiUsage()
     best = {}
-    for t0, t1, _ in cands:
-        r = best_clip(traj, t0, t1, styles, world=world, tries_per_style=per_style)
+    total = len(cands)
+    for i, (t0, t1, _) in enumerate(cands):
+        on_try = None
+        if on_score is not None:
+            on_try = lambda clip, stats, i=i: on_score(
+                ScoreEvent(traj, world, clip, stats, i, total)
+            )
+        r = best_clip(
+            traj, t0, t1, styles, world=world, tries_per_style=per_style, on_try=on_try
+        )
         if r:
             best[(t0, t1)] = r
     cands = [c for c in cands if (c[0], c[1]) in best]

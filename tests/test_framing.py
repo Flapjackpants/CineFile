@@ -174,3 +174,12 @@ def test_more_tries_never_worse():
     one = best_clip(traj, 0, 100, [a], world=world, tries_per_style=1)
     six = best_clip(traj, 0, 100, [a], world=world, tries_per_style=6)
     assert framing_multiplier(six[1]) >= framing_multiplier(one[1])
+
+
+def test_best_clip_calls_on_try():
+    traj = SimpleNamespace(sample=lambda t: Pose(0, 64, 0, 0, 0))
+    styles = [_style("a", True, 0.0), _style("b", False, 90.0)]
+    seen = []
+    best_clip(traj, 0, 100, styles, tries_per_style=2, on_try=lambda c, s: seen.append(s))
+    assert len(seen) == 4
+    assert all(isinstance(s, FramingStats) for s in seen)

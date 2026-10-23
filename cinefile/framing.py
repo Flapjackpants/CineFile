@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Optional, Sequence, Tuple
+from typing import Any, Callable, Optional, Sequence, Tuple
 
 from .camera import CameraClip, synthesize_clip
 from .styles_loader import Style, style_variant
@@ -31,6 +31,16 @@ class FramingStats:
     @property
     def near_frac(self) -> float:
         return self.center_frac + self.thirds_frac
+
+
+@dataclass
+class ScoreEvent:
+    traj: Any
+    world: Any
+    clip: CameraClip
+    stats: FramingStats
+    window_index: int
+    window_total: int
 
 
 def project_to_screen(
@@ -149,6 +159,7 @@ def best_clip(
     styles: Sequence[Style],
     world=None,
     tries_per_style: int = 1,
+    on_try: Optional[Callable[[CameraClip, FramingStats], None]] = None,
 ) -> Optional[Tuple[CameraClip, FramingStats]]:
     best: Optional[Tuple[CameraClip, FramingStats]] = None
     for style in styles:
@@ -157,6 +168,8 @@ def best_clip(
             if clip is None:
                 continue
             stats = framing_stats(traj, clip, world=world)
+            if on_try is not None:
+                on_try(clip, stats)
             if best is None or framing_multiplier(stats) > framing_multiplier(best[1]):
                 best = (clip, stats)
     return best

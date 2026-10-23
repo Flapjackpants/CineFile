@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import shutil
 import sys
 from pathlib import Path
 
 from . import __version__
+from .ascii_view import VIEW_COLS, ScoreViewer, TerminalFrames
 from .editor import normalize_editor_dir
 from .pipeline import run
 from .settings import load_settings
@@ -121,6 +123,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Camera variants to score per clip; in auto style, split evenly across styles (default: saved setting, initially 1)",
     )
     p.add_argument(
+        "--no-view",
+        action="store_true",
+        help="Do not draw the live ASCII view of the camera being scored",
+    )
+    p.add_argument(
         "--list-styles",
         action="store_true",
         help="Print available styles and exit",
@@ -214,15 +221,25 @@ def main(argv: list[str] | None = None) -> int:
 
     editor_dir = _resolve_editor_dir_arg(args.editor_dir)
 
+    view = None
+    extra = {}
+    if not args.no_view and sys.stderr.isatty():
+        cols = max(20, min(VIEW_COLS, shutil.get_terminal_size((80, 24)).columns - 1))
+        view = TerminalFrames(sys.stderr)
+        extra["on_score"] = ScoreViewer(view, cols=cols)
     try:
         result = run(
             args.replay,
             editor_dir=editor_dir,
             **run_kwargs,
+            **extra,
         )
     except Exception as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
+    finally:
+        if view is not None:
+            view.clear()
 
     _print_result(result, run_kwargs["style_id"], run_kwargs["offline"])
     return 0
