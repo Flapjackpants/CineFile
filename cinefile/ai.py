@@ -11,6 +11,8 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import requests
 
+from .camera import slice_candidates
+
 # Off-peak list prices per 1M tokens (USD)
 DEEPSEEK_IN = 0.15
 DEEPSEEK_OUT = 0.60
@@ -137,16 +139,19 @@ def plan_clips_deepseek(
     if cfg.offline or not cfg.deepseek_key or target_clips <= 0:
         return None
 
-    # Only send top pool to keep cost down
-    pool = list(candidates)[: min(120, len(candidates))]
+    # A global top 120 can come from one stretch of the replay, so take the best of each time slice.
+    n = min(target_clips, 120)
+    per = max(1, 120 // n)
+    pool_idx = sorted(i for sl in slice_candidates(candidates, n) for i in sl[:per])[:120]
+    pool_set = set(pool_idx)
     payload_windows = [
         {
             "index": i,
-            "start_s": round(t0 / 20.0, 1),
-            "end_s": round(t1 / 20.0, 1),
-            "score": round(s, 2),
+            "start_s": round(candidates[i][0] / 20.0, 1),
+            "end_s": round(candidates[i][1] / 20.0, 1),
+            "score": round(candidates[i][2], 2),
         }
-        for i, (t0, t1, s) in enumerate(pool)
+        for i in pool_idx
     ]
     messages = [
         {
@@ -180,7 +185,7 @@ def plan_clips_deepseek(
     if parsed is None:
         return None
     try:
-        indices = [int(i) for i in parsed.get("indices", []) if 0 <= int(i) < len(pool)]
+        indices = [int(i) for i in parsed.get("indices", []) if int(i) in pool_set]
     except Exception:
         return None
     return indices or None
