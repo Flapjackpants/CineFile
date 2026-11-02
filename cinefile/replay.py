@@ -16,6 +16,7 @@ ACTION_NEXT_TICK = "flashback:action/next_tick"
 ACTION_MOVE = "flashback:action/move_entities"
 ACTION_CREATE_LOCAL = "flashback:action/create_local_player"
 ACTION_CHUNK_CACHED = "flashback:action/level_chunk_cached"
+ACTION_GAME_PACKET = "flashback:action/game_packet"
 
 
 @dataclass
@@ -136,12 +137,18 @@ def _parse_chunk(
         raise ValueError(f"Invalid snapshot size {snapshot_size}")
     # Snapshot also contains sized actions — parse for create_local_player / initial poses
     snap_end = r.i + snapshot_size
+    login_seen = False
     while r.i < snap_end:
         aid = r.read_varint()
         size = r.read_int()
         payload = r.read_bytes(size)
         name = action_names.get(aid, "")
-        if name == ACTION_CREATE_LOCAL:
+        if name == ACTION_GAME_PACKET and not login_seen:
+            # a joined recording uses a new entity ID, so the login packet re-identifies the player
+            eid = _parse_login_entity_id(payload)
+            if eid is not None:
+                player_id, login_seen = eid, True
+        elif name == ACTION_CREATE_LOCAL:
             last_player = _parse_create_local(payload) or last_player
             if last_player:
                 traj.poses[tick] = last_player
@@ -182,6 +189,21 @@ def _ingest_chunk_ref(payload: bytes, tick: int, traj: Trajectory) -> None:
         traj.chunk_refs.append((tick, ByteReader(payload).read_varint()))
     except EOFError:
         pass
+
+
+def _parse_login_entity_id(payload: bytes) -> Optional[int]:
+    """Entity ID if payload is shaped like a login game packet, else None."""
+    try:
+        r = ByteReader(payload)
+        r.read_varint()
+        eid = r.read_int()
+        if eid <= 0 or r.read_u8() not in (0, 1):
+            return None
+        if not 1 <= r.read_varint() <= 64 or ":" not in r.read_identifier():
+            return None
+        return eid
+    except Exception:
+        return None
 
 
 def _parse_create_local(payload: bytes) -> Optional[Pose]:
