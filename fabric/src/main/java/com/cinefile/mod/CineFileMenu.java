@@ -32,11 +32,17 @@ public final class CineFileMenu {
         }
 
         ImGui.separator();
-        ImGui.menuItem("Auto Create##CineFile", "", false, false); // enabled in Stage 6
-        if (ImGui.menuItem("Cut##CineFile", "", false, !Flashback.isExporting())) {
+        boolean running = AutoCreateController.isRunning();
+        if (running) {
+            if (ImGui.menuItem(AutoCreateController.progressLabel() + "###CineFileAuto")) AutoCreateController.cancel();
+            ImGui.textDisabled(AutoCreateController.statusLine());
+        } else if (ImGui.menuItem("Auto Create##CineFile", "", false, !Flashback.isExporting())) {
+            AutoCreateController.start();
+        }
+        if (ImGui.menuItem("Cut##CineFile", "", false, !running && !Flashback.isExporting())) {
             CutTracks.addAtPlayhead();
         }
-        if (ImGui.menuItem("Delete All##CineFile", "", false, tracks > 0 || hasRange)) {
+        if (ImGui.menuItem("Delete All##CineFile", "", false, !running && (tracks > 0 || hasRange))) {
             openDialog = true;
         }
 

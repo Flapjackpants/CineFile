@@ -120,6 +120,9 @@ class ClipVerifierTest {
         Trajectory t = traj(300);
         FakeDriver d = new FakeDriver();
         d.neverAtTick = true;
-        assertEquals(Verdict.TIMEOUT, run(t, clip(t, 0, 90), cfg(30), d));
+        ClipVerifier v = new ClipVerifier(t, clip(t, 0, 90), null, cfg(30));
+        assertNull(v.step(d)); // seek
+        for (int i = 0; i < 600; i++) assertNull(v.step(d), "step " + i);
+        assertEquals(Verdict.TIMEOUT, v.step(d));
     }
 }

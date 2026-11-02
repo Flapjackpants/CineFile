@@ -18,4 +18,14 @@ class FlashbackHooksTest {
         assertNotNull(tw.getDeclaredField("selectedKeyframesList"));
         assertNotNull(load(p + "editor.ui.windows.MainMenuBar").getDeclaredMethod("renderInner"));
     }
+
+    @Test
+    void liveHooksExist() throws Exception {
+        String p = "com.moulberry.flashback.";
+        Class<?> rs = load(p + "playback.ReplayServer");
+        for (String f : new String[] {"playbackFileSystem", "jumpToTick", "fastForwarding", "replayPaused", "forceApplyKeyframes"}) {
+            assertNotNull(rs.getDeclaredField(f), f);
+        }
+        assertNotNull(load(p + "keyframe.change.KeyframeChangeCameraPosition").getMethod("position"));
+    }
 }

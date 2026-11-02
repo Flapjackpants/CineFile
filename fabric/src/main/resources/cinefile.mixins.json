@@ -6,7 +6,8 @@
     "KeyframeTrackMixin",
     "MainMenuBarMixin",
     "TimelineWindowMixin",
-    "TimelineWindowAccessor"
+    "TimelineWindowAccessor",
+    "ReplayServerAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

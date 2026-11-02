@@ -6,7 +6,7 @@ import java.util.Objects;
 
 /** Steps through one clip's sample ticks on the live replay, one driver interaction per call. */
 public final class ClipVerifier {
-    private static final int SEEK_TIMEOUT_STEPS = 200;
+    private static final int SEEK_TIMEOUT_STEPS = 600;
 
     private final Trajectory t;
     private final Object handle;
