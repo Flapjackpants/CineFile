@@ -9,6 +9,10 @@ cd CineFile
 python3 -m pip install -e .
 ```
 
+## Minecraft mod
+
+`fabric/` holds a Fabric mod for Minecraft 26.3 that does this inside Flashback, on your real screen, with a button in the top row. See [fabric/README.md](fabric/README.md).
+
 ## Usage
 
 ### Interactive menu

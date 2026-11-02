@@ -1,0 +1,16 @@
+{
+  "required": true,
+  "package": "com.cinefile.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "KeyframeTrackMixin",
+    "RealTimeMappingMixin",
+    "MainMenuBarMixin",
+    "TimelineWindowMixin",
+    "TimelineWindowAccessor",
+    "ReplayServerAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
