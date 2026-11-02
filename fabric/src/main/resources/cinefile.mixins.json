@@ -2,7 +2,12 @@
   "required": true,
   "package": "com.cinefile.mixin",
   "compatibilityLevel": "JAVA_21",
-  "client": [],
+  "client": [
+    "KeyframeTrackMixin",
+    "MainMenuBarMixin",
+    "TimelineWindowMixin",
+    "TimelineWindowAccessor"
+  ],
   "injectors": {
     "defaultRequire": 1
   }
