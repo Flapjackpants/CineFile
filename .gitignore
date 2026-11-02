@@ -10,3 +10,4 @@ build/
 
 fabric/.gradle/
 fabric/run/
+fabric/logs/
