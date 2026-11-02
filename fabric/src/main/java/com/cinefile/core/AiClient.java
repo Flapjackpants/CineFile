@@ -19,7 +19,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
 
 /** OpenAI-compatible chat client (port of the DeepSeek parts of cinefile/ai.py). */
-public final class AiClient {
+public final class AiClient implements ShotAi {
     private static final Logger LOGGER = Logger.getLogger("cinefile");
     private static final int IMAGE_TOKENS = 1024;
     private static final String REVIEW_SYSTEM = "You judge Minecraft cinematic camera shots from screenshots of the real game. "
