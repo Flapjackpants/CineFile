@@ -18,6 +18,7 @@ public final class CineFileConfig {
     public double maxAiUsd = 0.05, clipLengthS = 10, durationS = 180, teleportBlocks = 12;
     public boolean think = false, visualReview = false;
     public boolean rejectCuts = true, rejectDimensionChanges = true, rejectBlockClipping = true, rejectBlockedView = true;
+    public boolean rejectOffscreenPlayer = true;
     public int tries = 5, checkEveryTicks = 10, cutLengthTicks = 0;
     public GapFill gapFill = GapFill.CUT;
 

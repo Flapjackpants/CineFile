@@ -17,6 +17,7 @@ class ClipVerifierTest {
     static CineFileConfig cfg(int every) {
         CineFileConfig c = new CineFileConfig();
         c.checkEveryTicks = every;
+        c.rejectOffscreenPlayer = false; // these trajectories don't frame the player
         return c;
     }
 
@@ -98,7 +99,7 @@ class ClipVerifierTest {
     }
 
     @Test
-    void blockedViewNeedsMajority() throws Exception {
+    void blockedViewThreshold() throws Exception {
         Trajectory t = traj(300);
         CameraClip c = clip(t, 0, 90); // visits 0, 30, 60, 90
         CineFileConfig cf = cfg(30);
@@ -106,9 +107,9 @@ class ClipVerifierTest {
         FakeDriver d = new FakeDriver();
         d.blocked = (a, b) -> true;
         assertEquals(Verdict.VIEW_BLOCKED, run(t, c, cf, d));
+        d.blocked = (a, b) -> d.cur == 0;
+        assertEquals(Verdict.OK, run(t, c, cf, d)); // exactly a quarter
         d.blocked = (a, b) -> d.cur <= 30;
-        assertEquals(Verdict.OK, run(t, c, cf, d));
-        d.blocked = (a, b) -> d.cur <= 60;
         assertEquals(Verdict.VIEW_BLOCKED, run(t, c, cf, d));
         d.blocked = (a, b) -> true;
         cf.rejectBlockedView = false;
@@ -124,5 +125,43 @@ class ClipVerifierTest {
         assertNull(v.step(d)); // seek
         for (int i = 0; i < 600; i++) assertNull(v.step(d), "step " + i);
         assertEquals(Verdict.TIMEOUT, v.step(d));
+    }
+
+    /** Player stands at (0,64,0) except at the given ticks, where he is 50 blocks behind the camera. */
+    static Trajectory lost(int... awayTicks) throws Exception {
+        return Replays.trajectory(t -> {
+            for (int a : awayTicks) if (t >= a && t < a + 10) return new Pose(0, 64, -50, 0, 0);
+            return new Pose(0, 64, 0, 0, 0);
+        }, 300);
+    }
+
+    static CameraClip fixed(double yaw) {
+        CameraKey k = new CameraKey(0, 0, 65, -10, yaw, 0);
+        return new CameraClip(0, 90, k, k, 1, "t");
+    }
+
+    static CineFileConfig offCfg() {
+        CineFileConfig c = cfg(30);
+        c.rejectCuts = false;
+        c.rejectBlockClipping = false;
+        c.rejectOffscreenPlayer = true;
+        return c;
+    }
+
+    @Test
+    void offscreenHonoursSetting() throws Exception {
+        Trajectory t = lost();
+        assertEquals(Verdict.OK, run(t, fixed(0), offCfg(), new FakeDriver()));
+        assertEquals(Verdict.PLAYER_OFFSCREEN, run(t, fixed(180), offCfg(), new FakeDriver()));
+        CineFileConfig off = offCfg();
+        off.rejectOffscreenPlayer = false;
+        assertEquals(Verdict.OK, run(t, fixed(180), off, new FakeDriver()));
+    }
+
+    @Test
+    void offscreenThreshold() throws Exception {
+        // visits 0, 30, 60, 90
+        assertEquals(Verdict.OK, run(lost(90), fixed(0), offCfg(), new FakeDriver()));
+        assertEquals(Verdict.PLAYER_OFFSCREEN, run(lost(60, 90), fixed(0), offCfg(), new FakeDriver()));
     }
 }

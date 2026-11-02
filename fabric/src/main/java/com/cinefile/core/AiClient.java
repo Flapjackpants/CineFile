@@ -25,7 +25,8 @@ public final class AiClient implements ShotAi {
     private static final String REVIEW_SYSTEM = "You judge Minecraft cinematic camera shots from screenshots of the real game. "
         + "The frames are the start, middle and end of one shot. Score it 0-10: the player is visible and at the center "
         + "or on rule-of-thirds points in most frames; the camera is not inside or behind blocks; the composition reads "
-        + "clearly with depth. Reply with ONLY JSON: {\"score\": number}.";
+        + "clearly with depth. Thin green or yellow lines and boxes are an editor overlay; ignore them. "
+        + "Reply with ONLY JSON: {\"score\": number}.";
 
     private final String apiKey;
     private final String base;

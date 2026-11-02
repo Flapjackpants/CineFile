@@ -81,6 +81,7 @@ public class SettingsScreen extends Screen {
         l.toggle("Reject dimension changes", c.rejectDimensionChanges, v -> c.rejectDimensionChanges = v, null);
         l.toggle("Reject camera through blocks", c.rejectBlockClipping, v -> c.rejectBlockClipping = v, null);
         l.toggle("Reject blocked view", c.rejectBlockedView, v -> c.rejectBlockedView = v, null);
+        l.toggle("Reject player off screen", c.rejectOffscreenPlayer, v -> c.rejectOffscreenPlayer = v, null);
         l.number("Teleport distance (blocks)", () -> c.teleportBlocks, v -> c.teleportBlocks = v);
         l.number("Check every N ticks", () -> c.checkEveryTicks, v -> c.checkEveryTicks = (int) Math.round(v));
 

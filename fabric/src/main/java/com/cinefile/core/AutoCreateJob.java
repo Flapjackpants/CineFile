@@ -164,7 +164,10 @@ public final class AutoCreateJob {
             for (Style s : styles) {
                 for (int i = 0; i < perStyle; i++) {
                     CameraClip k = CameraSynth.synthesize(t, c.start(), c.end(), Styles.variant(s, i, c.start()), 0);
-                    if (k != null) vs.add(new Variant(k, Framing.multiplier(Framing.stats(t, k, 20))));
+                    if (k == null) continue;
+                    FramingStats fs = Framing.stats(t, k, 20);
+                    if (cfg.rejectOffscreenPlayer && fs.onscreenFrac() < 0.5) continue;
+                    vs.add(new Variant(k, Framing.multiplier(fs)));
                 }
             }
             if (vs.isEmpty()) continue;

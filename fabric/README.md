@@ -32,7 +32,8 @@ The camera path is checked in the real world at that moment in the replay.
 | Reject cuts | Drops clips where the camera jumps between shots. |
 | Reject dimension changes | Drops clips where the camera changes dimension. |
 | Reject camera through blocks | Drops clips where the camera passes through blocks. Also rejects unloaded chunks, since they can't be checked. |
-| Reject blocked view | Drops clips where the player is hidden in more than half the checks. |
+| Reject blocked view | Drops clips where the player is hidden in more than a quarter of the checks. |
+| Reject player off screen | Drops clips where the player is off screen for more than a quarter of the checks. |
 | Teleport distance | Largest jump in camera position allowed between checks. |
 | Check every N ticks | How often the camera path is sampled. |
 

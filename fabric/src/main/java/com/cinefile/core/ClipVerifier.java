@@ -13,7 +13,7 @@ public final class ClipVerifier {
     private final CineFileConfig cfg;
     private final int[] ticks;
     private final Verdict early;
-    private int i, waits, blockedView;
+    private int i, waits, blockedView, onscreen;
     private boolean seeked;
     private String firstDim;
     private double[] prev;
@@ -59,7 +59,13 @@ public final class ClipVerifier {
             Pose p = t.sample(tick);
             if (p != null && d.blocked(pos, new double[] {p.x(), p.y() + 1.0, p.z()})) blockedView++;
         }
+        if (cfg.rejectOffscreenPlayer) {
+            Pose p = t.sample(tick);
+            double[] uv = p == null ? null : Framing.projectToScreen(c, new double[] {p.x(), p.y() + 1.0, p.z()});
+            if (uv != null && uv[0] >= 0 && uv[0] <= 1 && uv[1] >= 0 && uv[1] <= 1) onscreen++;
+        }
         if (++i < ticks.length) return null;
-        return blockedView * 2 > ticks.length ? Verdict.VIEW_BLOCKED : Verdict.OK;
+        if (blockedView * 4 > ticks.length) return Verdict.VIEW_BLOCKED;
+        return cfg.rejectOffscreenPlayer && onscreen * 4 < ticks.length * 3 ? Verdict.PLAYER_OFFSCREEN : Verdict.OK;
     }
 }

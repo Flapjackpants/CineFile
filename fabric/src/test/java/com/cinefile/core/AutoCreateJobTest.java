@@ -41,6 +41,7 @@ class AutoCreateJobTest {
     static CineFileConfig cfg(double durationS) {
         CineFileConfig c = new CineFileConfig();
         c.durationS = durationS;
+        c.rejectOffscreenPlayer = false; // these trajectories don't frame the player
         return c;
     }
 
@@ -124,6 +125,20 @@ class AutoCreateJobTest {
         r = run(d2, new Trajectory("u", "n", 0), cfg(30), null).result();
         assertEquals("No valid clip windows found", r.error());
         assertTrue(d2.shown.isEmpty());
+    }
+
+    @Test
+    void planningDropsOffscreenVariants() throws Exception {
+        Trajectory fast = Replays.trajectory(t -> new Pose(60 * Math.sin(2 * Math.PI * t / 200), 64, 0, 0, 0), 1000);
+        FakeDriver d = new FakeDriver();
+        CineFileConfig on = cfg(30);
+        on.rejectOffscreenPlayer = true;
+        AutoCreateJob.Result r = run(d, fast, on, null).result();
+        assertEquals("No valid clip windows found", r.error());
+        assertTrue(d.shown.isEmpty());
+        CineFileConfig off = cfg(30);
+        off.rejectOffscreenPlayer = false;
+        assertNull(run(new FakeDriver(), fast, off, null).result().error());
     }
 
     @Test
