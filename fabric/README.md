@@ -29,18 +29,18 @@ The camera path is checked in the real world at that moment in the replay.
 
 | Setting | Meaning |
 |---------|---------|
-| Reject cuts | Drops clips where the camera jumps between shots. |
-| Reject dimension changes | Drops clips where the camera changes dimension. |
+| Reject cuts | Drops clips where the player teleports. |
+| Reject dimension changes | Drops clips where the player changes dimension. |
 | Reject camera through blocks | Drops clips where the camera passes through blocks. Also rejects unloaded chunks, since they can't be checked. |
 | Reject blocked view | Drops clips where the player is hidden in more than a quarter of the checks. |
 | Reject player off screen | Drops clips where the player is off screen for more than a quarter of the checks. |
-| Teleport distance | Largest jump in camera position allowed between checks. |
+| Teleport distance | How far the player must jump, in blocks, to count as a teleport. |
 | Check every N ticks | How often the camera path is sampled. |
 
 ## Other tools
 
-- **Cut** removes a range between two keyframes.
-- **Delete All** clears the track list.
+- **Cut** adds a cut from the playhead to 5 seconds later. Drag its keyframes to change the range.
+- **Delete All** asks first, then removes every track from the current scene and clears the export range. Undo restores the tracks, but not the range or custom track names.
 - Scrolling: the wheel scrolls tracks, Ctrl+wheel zooms, and Shift+wheel pans.
 
 ## Cuts and short timelapses
@@ -63,15 +63,15 @@ Open settings through Mod Menu.
 | Base URL | Any OpenAI-compatible API. DeepSeek by default. |
 | Model | Model name sent to the API. |
 | Max spend | Spend cap, estimated at DeepSeek prices. |
-| Think harder | Asks the model to reason more before picking shots. |
+| Think harder | Lets the model use its default reasoning effort instead of low, which costs more. |
 | Screenshot review | Sends screenshots to the model for review. Off by default. |
 | Project | Your project description, sent to the API. |
 | Clip length | Target length of each clip. |
 | Total duration | Target length of the whole scene. |
 | Style | Shot style. `auto` by default. |
 | Tries per clip | How many candidates to try per clip. 5 by default. |
-| Fill gaps with | What fills empty time when no clip fits. |
-| Cut length | Length used by Cut. See above. |
+| Fill gaps with | What goes between placed clips: a cut, a 1-second timelapse, or nothing. |
+| Cut length | Length in ticks of newly made cuts. See above. |
 
 Leaving the key blank uses heuristics only.
 
