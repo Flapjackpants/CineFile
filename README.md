@@ -58,6 +58,8 @@ Settings are saved to `~/.config/cinefile/settings.json` (or `$XDG_CONFIG_HOME/c
 
 Clips whose camera passes through blocks, or whose view of the player is blocked, are scored lower when the replay contains chunk caches.
 
+Clips are spread across the whole replay, including every recording in a joined replay: CineFile picks the best clip from each equal time slice, skips idle slices and uses the next-best clips instead.
+
 Both paths accept a string or `null`. Other settings use the same defaults as the CLI. Older settings files still work: legacy `input_path`, `render_instance_path` and `output_path` keys are migrated to the new names.
 
 ### Input and output folders

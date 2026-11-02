@@ -14,7 +14,7 @@ from .ai import (
     review_clips_visual,
     score_candidates_laya,
 )
-from .camera import CameraClip, candidate_windows, select_clips_greedy
+from .camera import CameraClip, candidate_windows, select_clips_spread
 from .editor import (
     backup_and_write,
     build_editor_state,
@@ -163,12 +163,11 @@ def run(
                 break
         clips.sort(key=lambda c: c.start_tick)
     else:
-        clips = select_clips_greedy(
+        clips = select_clips_spread(
             cands,
             traj,
             styles[0],
             target_ticks=target_ticks,
-            min_gap_ticks=0,
             synth=synth,
         )
 

@@ -100,11 +100,11 @@ def _fake_pipeline(monkeypatch, cands, seen):
         lambda traj, t0, t1, styles, world=None, tries_per_style=1, on_try=None: (_clip(t0, t1), FramingStats(1.0, 1.0, 0.0, 1.0)),
     )
 
-    def greedy(candidates, traj, style, target_ticks, min_gap_ticks=0, synth=None):
+    def spread(candidates, traj, style, target_ticks, synth=None):
         seen.extend(candidates)
         return [_clip(t0, t1) for t0, t1, _ in candidates]
 
-    monkeypatch.setattr(pipeline, "select_clips_greedy", greedy)
+    monkeypatch.setattr(pipeline, "select_clips_spread", spread)
 
 
 def test_pipeline_fills_only_empty_space(monkeypatch, tmp_path: Path):

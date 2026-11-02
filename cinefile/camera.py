@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import math
+import statistics
 from dataclasses import dataclass
 from typing import Callable, List, Optional, Sequence, Tuple
 
 from .replay import Pose, Trajectory, continuous_segments
 from .styles_loader import Style
+
+SPREAD_FLOOR_RATIO = 0.25  # slices whose best window is below this × median score count as idle
 
 
 @dataclass
@@ -99,10 +102,13 @@ def candidate_windows(
 ) -> List[Tuple[int, int, float]]:
     if stride_ticks is None:
         stride_ticks = max(10, clip_ticks // 4)
+    # Thinning by score drops whole stretches of the timeline, so widen the stride instead.
+    segs = [(a, b) for a, b in continuous_segments(traj) if b - a >= clip_ticks]
+    if max_candidates > len(segs):
+        usable = sum(b - a - clip_ticks for a, b in segs)
+        stride_ticks = max(stride_ticks, math.ceil(usable / (max_candidates - len(segs))))
     out: List[Tuple[int, int, float]] = []
-    for seg_a, seg_b in continuous_segments(traj):
-        if seg_b - seg_a < clip_ticks:
-            continue
+    for seg_a, seg_b in segs:
         t = seg_a
         while t + clip_ticks <= seg_b:
             t1 = t + clip_ticks
@@ -114,14 +120,7 @@ def candidate_windows(
             out.append((t, t1, score))
             t += stride_ticks
     out.sort(key=lambda x: x[2], reverse=True)
-    if len(out) > max_candidates:
-        # keep top half by score, then subsample rest evenly for coverage
-        top = out[: max_candidates // 2]
-        rest = out[max_candidates // 2 :]
-        step = max(1, len(rest) // max(1, max_candidates - len(top)))
-        out = top + rest[::step]
-        out = out[:max_candidates]
-    return out
+    return out[:max_candidates]
 
 
 def synthesize_clip(
@@ -198,3 +197,51 @@ def select_clips_greedy(
         total += t1 - t0
     picked.sort(key=lambda c: c.start_tick)
     return picked
+
+
+def slice_candidates(candidates: Sequence[Tuple[int, int, float]], n: int) -> List[List[int]]:
+    """n equal time slices over candidates' start ticks; each holds candidate indices, best score first."""
+    slices: List[List[int]] = [[] for _ in range(n)]
+    if not candidates:
+        return slices
+    lo = min(c[0] for c in candidates)
+    hi = max(c[0] for c in candidates)
+    for i, (t0, _, _) in enumerate(candidates):
+        slices[(t0 - lo) * n // (hi - lo + 1)].append(i)
+    for sl in slices:
+        sl.sort(key=lambda i: candidates[i][2], reverse=True)
+    return slices
+
+
+def select_clips_spread(
+    candidates: Sequence[Tuple[int, int, float]],
+    traj: Trajectory,
+    style: Style,
+    target_ticks: int,
+    synth: Optional[Callable[[int, int, float], Optional[CameraClip]]] = None,
+) -> List[CameraClip]:
+    """Best clip per time slice, then greedy fill for idle or empty slices."""
+    if not candidates:
+        return []
+    clip_ticks = max(t1 - t0 for t0, t1, _ in candidates)
+    n = max(1, target_ticks // clip_ticks)
+    floor = SPREAD_FLOOR_RATIO * statistics.median(c[2] for c in candidates)
+    picked: List[CameraClip] = []
+    used: List[Tuple[int, int]] = []
+    for sl in slice_candidates(candidates, n):
+        for i in sl:
+            t0, t1, score = candidates[i]
+            if score < floor:
+                break
+            if any(not (t1 < a or t0 > b) for a, b in used):
+                continue
+            clip = synth(t0, t1, score) if synth else synthesize_clip(traj, t0, t1, style, score=score)
+            if clip is None:
+                continue
+            picked.append(clip)
+            used.append((t0, t1))
+            break
+    rest = [c for c in candidates if not any(not (c[1] < a or c[0] > b) for a, b in used)]
+    remaining = target_ticks - sum(t1 - t0 for t0, t1 in used)
+    fill = select_clips_greedy(rest, traj, style, target_ticks=remaining, synth=synth)
+    return sorted(picked + fill, key=lambda c: c.start_tick)
