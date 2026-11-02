@@ -14,6 +14,10 @@ public final class CutKeys {
         return leftKeyframeTicks >= CUT_BASE;
     }
 
+    public static boolean isCutSpeed(float speed) {
+        return speed >= CUT_TICKRATE / 20f;
+    }
+
     public static int[] rangeFromPlayhead(int playhead, int totalTicks) {
         int end = Math.min(playhead + 100, totalTicks);
         return end - playhead < 1 ? null : new int[] {playhead, end};

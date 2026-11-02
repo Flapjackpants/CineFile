@@ -6,6 +6,13 @@ import org.junit.jupiter.api.Test;
 
 class CutKeysTest {
     @Test
+    void cutSpeedOnlyMatchesCutRate() {
+        assertTrue(CutKeys.isCutSpeed(CutKeys.CUT_TICKRATE / 20f));
+        assertFalse(CutKeys.isCutSpeed(1f));
+        assertFalse(CutKeys.isCutSpeed(100000f));
+    }
+
+    @Test
     void zeroLengthIsSentinel() {
         assertArrayEquals(new int[] {1000000, 1000001}, CutKeys.ticksFor(0));
         assertTrue(CutKeys.isCut(1000000));

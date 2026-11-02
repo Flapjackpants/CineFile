@@ -20,6 +20,11 @@ class FlashbackHooksTest {
     }
 
     @Test
+    void realTimeMappingTargetExists() throws Exception {
+        assertNotNull(load("com.moulberry.flashback.state.RealTimeMapping").getDeclaredMethod("addMapping", int.class, float.class));
+    }
+
+    @Test
     void liveHooksExist() throws Exception {
         String p = "com.moulberry.flashback.";
         Class<?> rs = load(p + "playback.ReplayServer");

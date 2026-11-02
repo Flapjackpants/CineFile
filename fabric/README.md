@@ -51,6 +51,8 @@ Short timelapses leave stray frames from the middle of the skipped range. Measur
 
 Cuts are saved as timelapse tracks, so the replay still opens without this mod. A length-0 cut then plays as a 1-tick timelapse. Export still simulates the ticks inside a cut, so very long cuts export more slowly.
 
+A timelapse also changes how Flashback times later camera moves: its speed carries on after the track ends, until the next speed change. Very fast timelapses can make later cameras stutter. Length 0 cuts are not affected.
+
 ## Settings and API keys
 
 Open settings through Mod Menu.
