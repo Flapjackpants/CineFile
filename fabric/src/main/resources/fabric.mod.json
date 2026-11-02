@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "cinefile",
+  "version": "${version}",
+  "name": "CineFile",
+  "description": "Fills Flashback scenes with verified camera clips.",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["com.cinefile.mod.CineFileClient"],
+    "modmenu": ["com.cinefile.mod.ModMenuIntegration"]
+  },
+  "mixins": ["cinefile.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": ">=26.3 <26.4",
+    "java": ">=25",
+    "fabric-api": "*",
+    "flashback": ">=0.43.6 <0.44",
+    "modmenu": "*"
+  }
+}

@@ -7,3 +7,6 @@ build/
 *.pyc
 .DS_Store
 .env
+
+fabric/.gradle/
+fabric/run/
