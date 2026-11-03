@@ -41,6 +41,18 @@ public final class Styles {
                 s.thirdsSide());
     }
 
+    public static double fovScale(double fovDeg) {
+        return Math.clamp(Math.tan(Math.toRadians(53) / 2) / Math.tan(Math.toRadians(fovDeg) / 2), 0.4, 2.5);
+    }
+
+    public static Style tuned(Style s, double fovDeg) {
+        double scale = fovScale(fovDeg);
+        double orbit = Math.toDegrees(Math.atan(Math.tan(Math.toRadians(s.orbitDegrees()))
+                * Math.tan(Math.toRadians(fovDeg) / 2) / Math.tan(Math.toRadians(70) / 2)));
+        return new Style(s.id(), s.description(), s.distance() * scale, s.height() * scale,
+                s.lateral() * scale, s.pitch(), s.yawLock(), orbit, s.dollyScale(), s.thirdsSide());
+    }
+
     private static double uniform(Random rng, double lo, double hi) {
         return lo + (hi - lo) * rng.nextDouble();
     }

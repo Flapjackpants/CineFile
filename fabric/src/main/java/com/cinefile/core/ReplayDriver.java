@@ -8,6 +8,7 @@ public interface ReplayDriver {
     void seek(int tick);                      // non-blocking
     boolean atTick(int tick);                 // true once the client shows that tick
     String dimension();
+    double fovDegrees(); // vertical FOV the replay renders with
     boolean isLoaded(double[] pos);           // {x,y,z}
     boolean blocked(double[] from, double[] to); // true if a block is hit along the segment, or `from` is inside one
     Object showCandidate(CameraClip clip);    // tentative track: the screen follows it, not undoable

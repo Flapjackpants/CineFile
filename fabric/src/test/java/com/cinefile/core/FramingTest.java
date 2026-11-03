@@ -6,6 +6,23 @@ import org.junit.jupiter.api.Test;
 
 class FramingTest {
     @Test
+    void fovOverloadsAndSizeScore() throws Exception {
+        double[] cam = {0, 64, 0, 0, 0}, point = {1, 64, 5};
+        assertArrayEquals(Framing.projectToScreen(cam, point), Framing.projectToScreen(cam, point, 70), 1e-12);
+        Trajectory t = CameraSynthTest.stationary();
+        CameraClip center = CameraSynth.synthesize(t, 0, 30, Styles.resolve("locked-dolly").get(0), 0, FocusLevel.CENTER, 53);
+        assertEquals(1, Framing.stats(t, center, 20, 53).onscreenFrac(), 1e-12);
+        double[] uv = Framing.projectToScreen(Framing.cameraAt(center, 0), new double[] {0, 65, 0}, 53);
+        assertEquals(0.5, uv[1], 0.05);
+        assertEquals(1, Framing.sizeScore(t, center, 20, 53), 1e-6);
+        assertEquals(Framing.stats(t, center, 20), Framing.stats(t, center, 20, 70));
+
+        CameraClip far = CameraSynth.synthesize(t, 0, 30, Styles.resolve("high-crane").get(0), 0, FocusLevel.CENTER, 53);
+        assertEquals(0.6, Framing.sizeScore(t, far, 20, 53), 0.05);
+        CameraClip offscreen = CameraSynth.synthesize(t, 0, 30, Styles.resolve("high-crane").get(0), 0);
+        assertEquals(0, Framing.sizeScore(t, offscreen, 20, 70), 1e-12);
+    }
+    @Test
     void projectToScreenMatchesPython() {
         // cinefile.framing.project_to_screen
         assertArrayEquals(new double[] {0.580333325379244, 0.5}, Framing.projectToScreen(new double[] {0, 64, 0, 0, 0}, new double[] {1, 64, 5}), 1e-6);

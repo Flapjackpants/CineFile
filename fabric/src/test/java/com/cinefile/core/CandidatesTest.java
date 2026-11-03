@@ -6,6 +6,24 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class CandidatesTest {
+    @Test
+    void presenceBreaksSplitWindowsEvenWithFlagsOff() throws Exception {
+        java.util.List<Replays.Action> stream = new java.util.ArrayList<>();
+        for (int tick = 1; tick <= 40; tick++) {
+            stream.add(Replays.next());
+            if (tick == 10) stream.add(Replays.remove(8));
+            if (tick == 30) stream.add(Replays.add(8, new java.util.UUID(3, 4), 150, new Pose(30, 64, 0, 0, 0)));
+        }
+        byte[] c = Replays.chunk(List.of(Replays.login(7), Replays.create(new Pose(0, 64, 0, 0, 0)),
+                Replays.add(8, new java.util.UUID(3, 4), 150, new Pose(0, 64, 0, 0, 0))), stream);
+        Trajectory t = ReplayParser.parse(Replays.files("{\"uuid\":\"u\",\"total_ticks\":41}", java.util.Map.of("c0.flashback", c)),
+                12, new PlayerPacketIds(90, 91, 150)).player("00000000-0000-0003-0000-000000000004");
+        List<Candidate> windows = Candidates.windows(t, 5, 500, false, false);
+        assertFalse(windows.isEmpty());
+        assertTrue(windows.stream().noneMatch(w -> w.start() < 10 && w.end() >= 10));
+        assertTrue(windows.stream().noneMatch(w -> w.start() < 30 && w.end() >= 30));
+        assertTrue(windows.stream().noneMatch(w -> w.start() >= 11 && w.end() <= 29));
+    }
     // 200 ticks; teleport of 100 blocks at tick 120. Same fixture drives the Python numbers below.
     static Trajectory fixture() throws Exception {
         return Replays.trajectory(t -> new Pose(0.4 * t + (t >= 120 ? 100 : 0), 64, 3 * Math.sin(t / 10.0), (t * 7) % 90, 5), 200);

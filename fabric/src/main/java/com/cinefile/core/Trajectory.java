@@ -5,14 +5,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 public final class Trajectory {
     private final String uuid;
     private final String name;
     private int totalTicks;
+    private String playerUuid;
+    private List<Trajectory> players = List.of(this);
     final TreeMap<Integer, Pose> poses = new TreeMap<>();
     final List<Integer> cuts = new ArrayList<>();
     final List<Integer> dimensionChanges = new ArrayList<>();
+    final TreeSet<Integer> presenceBreaks = new TreeSet<>();
 
     Trajectory(String uuid, String name, int totalTicks) {
         this.uuid = uuid;
@@ -44,6 +48,31 @@ public final class Trajectory {
 
     public String name() {
         return name;
+    }
+
+    public String playerUuid() {
+        return playerUuid;
+    }
+
+    void setPlayerUuid(String id) {
+        playerUuid = id;
+    }
+
+    void setPlayers(List<Trajectory> all) {
+        players = List.copyOf(all);
+    }
+
+    public List<Trajectory> players() {
+        return players;
+    }
+
+    public Trajectory player(String id) {
+        for (Trajectory t : players) if (id != null && id.equals(t.playerUuid)) return t;
+        return null;
+    }
+
+    public List<Integer> presenceBreaks() {
+        return List.copyOf(presenceBreaks);
     }
 
     /** Ticks where a teleport starts, ascending. */

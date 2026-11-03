@@ -5,6 +5,7 @@ import com.cinefile.core.AutoCreateJob;
 import com.cinefile.core.CineFileConfig;
 import com.cinefile.core.FsReplayFiles;
 import com.cinefile.core.ReplayParser;
+import com.cinefile.core.PlayerPacketIds;
 import com.cinefile.core.Summary;
 import com.cinefile.core.Trajectory;
 import com.cinefile.mixin.ReplayServerAccessor;
@@ -40,7 +41,7 @@ public final class AutoCreateController {
         return driver != null ? driver.status() : "Reading replay...";
     }
 
-    public static void start() {
+    public static void start(double budgetUsd) {
         if (isRunning() || Flashback.isExporting()) return;
         ReplayServer s = Flashback.getReplayServer();
         EditorState e = EditorStateManager.getCurrent();
@@ -48,14 +49,22 @@ public final class AutoCreateController {
         server = s;
         state = e;
         cfg = CineFileClient.config();
-        ai = cfg.apiKey.isBlank() ? null : new AiClient(cfg.apiKey, cfg.baseUrl, cfg.model, cfg.maxAiUsd, cfg.think);
+        ai = cfg.apiKey.isBlank() ? null : new AiClient(cfg.apiKey, cfg.baseUrl, cfg.model, Math.max(0, budgetUsd), cfg.think);
         parseCancelled = false;
         driver = null;
         double teleport = cfg.teleportBlocks;
         FsReplayFiles files = new FsReplayFiles(((ReplayServerAccessor) s).cinefile$fileSystem());
+        PlayerPacketIds ids;
+        try {
+            ids = PlayerPackets.current();
+        } catch (RuntimeException ex) {
+            CineFileClient.LOGGER.warn("CineFile: could not resolve player packet ids", ex);
+            ids = null;
+        }
+        PlayerPacketIds parseIds = ids;
         parse = CompletableFuture.supplyAsync(() -> {
             try {
-                return ReplayParser.parse(files, teleport);
+                return ReplayParser.parse(files, teleport, parseIds);
             } catch (java.io.IOException ex) {
                 throw new java.io.UncheckedIOException(ex);
             }

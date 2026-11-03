@@ -20,19 +20,28 @@ public final class CameraSynth {
     }
 
     /** Camera behind and beside the player: x, y, z, yaw, pitch. */
-    private static double[] offsetCamera(Pose p, Style s, double side, Double yawOverride) {
+    private static double[] offsetCamera(Pose p, Style s, double side, Double yawOverride, FocusLevel level, double fovScale) {
         double yawRad = Math.toRadians(yawOverride != null ? yawOverride : p.yaw());
         double fx = -Math.sin(yawRad), fz = Math.cos(yawRad);
         double rx = Math.cos(yawRad), rz = Math.sin(yawRad);
         double cx = p.x() - fx * s.distance() + rx * s.lateral() * side;
-        double cy = p.y() + s.height() + 1.62;
+        double cy = level == null ? p.y() + s.height() + 1.62
+                : p.y() + level.aimHeight() + (level.cameraHeight() - level.aimHeight()) * fovScale;
         double cz = p.z() - fz * s.distance() + rz * s.lateral() * side;
-        double[] yp = lookYawPitch(cx, cy, cz, p.x() + fx * 2.0, p.y() + 1.4, p.z() + fz * 2.0);
-        return new double[] {cx, cy, cz, yp[0], s.yawLock() ? s.pitch() : yp[1]};
+        double[] yp = lookYawPitch(cx, cy, cz, p.x() + fx * 2.0, p.y() + (level == null ? 1.4 : level.aimHeight()), p.z() + fz * 2.0);
+        return new double[] {cx, cy, cz, yp[0], level == null && s.yawLock() ? s.pitch() : yp[1]};
     }
 
     /** Two-keyframe clip from t0 to t1; null if the trajectory has no pose there. */
     public static CameraClip synthesize(Trajectory t, int t0, int t1, Style s, double score) {
+        return synthesize(t, t0, t1, s, score, null, 1);
+    }
+
+    public static CameraClip synthesize(Trajectory t, int t0, int t1, Style s, double score, FocusLevel level, double fovDeg) {
+        if (level == FocusLevel.AUTO) throw new IllegalArgumentException("AUTO must be expanded into candidates");
+        if (level != null) s = Styles.tuned(s, fovDeg);
+        FocusLevel fixed = level == FocusLevel.STYLE ? null : level;
+        double fovScale = fixed == null ? 1 : Styles.fovScale(fovDeg);
         Pose p0 = t.sample(t0), p1 = t.sample(t1);
         if (p0 == null || p1 == null) return null;
         double side;
@@ -41,13 +50,13 @@ public final class CameraSynth {
         else side = (p1.x() - p0.x()) >= 0 ? 1.0 : -1.0;
 
         Double shotYaw = s.yawLock() ? p0.yaw() : null;
-        double[] k0 = offsetCamera(p0, s, side, shotYaw);
-        double[] k1 = offsetCamera(p1, s, side, shotYaw);
+        double[] k0 = offsetCamera(p0, s, side, shotYaw, fixed, fovScale);
+        double[] k1 = offsetCamera(p1, s, side, shotYaw, fixed, fovScale);
         double yaw1, pitch0 = k0[4], pitch1 = k1[4];
         if (s.yawLock()) {
             yaw1 = k0[3];
-            pitch0 = s.pitch();
-            pitch1 = s.pitch();
+            pitch0 = k0[4];
+            pitch1 = k0[4];
         } else {
             yaw1 = wrapDegrees(k0[3] + s.orbitDegrees() * side);
         }

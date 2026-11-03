@@ -32,6 +32,20 @@ class ClipVerifierTest {
     }
 
     @Test
+    void offscreenCheckUsesReplayFov() throws Exception {
+        Trajectory t = Replays.trajectory(tick -> new Pose(2, 64, 4, 0, 0), 100);
+        CameraClip k = new CameraClip(0, 90, new CameraKey(0, 0, 65, 0, 0, 0),
+            new CameraKey(90, 0, 65, 0, 0, 0), 0, "test");
+        CineFileConfig c = cfg(10);
+        c.rejectOffscreenPlayer = true;
+        FakeDriver d = new FakeDriver();
+        d.fov = 90;
+        assertEquals(Verdict.OK, run(t, k, c, d));
+        d.fov = 20;
+        assertEquals(Verdict.PLAYER_OFFSCREEN, run(t, k, c, d));
+    }
+
+    @Test
     void visitsStepsAndAlwaysEnd() throws Exception {
         Trajectory t = traj(300);
         FakeDriver d = new FakeDriver();

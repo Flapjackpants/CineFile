@@ -81,6 +81,11 @@ public final class LiveReplayDriver implements ReplayDriver {
     }
 
     @Override
+    public double fovDegrees() {
+        return state.replayVisuals.overrideFov ? state.replayVisuals.overrideFovAmount : Minecraft.getInstance().options.fov().get();
+    }
+
+    @Override
     public boolean isLoaded(double[] pos) {
         return Minecraft.getInstance().level.getChunkSource().hasChunk((int) Math.floor(pos[0]) >> 4, (int) Math.floor(pos[2]) >> 4);
     }

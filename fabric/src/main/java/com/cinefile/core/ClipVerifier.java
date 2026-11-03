@@ -61,7 +61,7 @@ public final class ClipVerifier {
         }
         if (cfg.rejectOffscreenPlayer) {
             Pose p = t.sample(tick);
-            double[] uv = p == null ? null : Framing.projectToScreen(c, new double[] {p.x(), p.y() + 1.0, p.z()});
+            double[] uv = p == null ? null : Framing.projectToScreen(c, new double[] {p.x(), p.y() + 1.0, p.z()}, d.fovDegrees());
             if (uv != null && uv[0] >= 0 && uv[0] <= 1 && uv[1] >= 0 && uv[1] <= 1) onscreen++;
         }
         if (++i < ticks.length) return null;

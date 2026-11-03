@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
@@ -36,6 +38,165 @@ class AutoCreateJobTest {
 
     static Trajectory traj(int n) throws Exception {
         return Replays.trajectory(t -> new Pose(0.4 * t, 64, 3 * Math.sin(t / 10.0), (t * 7) % 90, 5), n);
+    }
+
+    static Trajectory walk() throws Exception {
+        return Replays.trajectory(t -> new Pose(0.4 * t, 64, 0, 0, 0), 500);
+    }
+
+    static CineFileConfig walkConfig(FocusLevel level) {
+        CineFileConfig c = cfg(10);
+        c.focusLevel = level;
+        return c;
+    }
+
+    private static final String LOCAL = "00000000-0000-0001-0000-000000000002";
+    private static final String OTHER = "00000000-0000-0003-0000-000000000004";
+
+    private static Trajectory twoPlayers(boolean localActive, boolean otherActive, int from, int until) throws Exception {
+        List<Replays.Action> stream = new ArrayList<>();
+        for (int tick = 1; tick < 500; tick++) {
+            stream.add(Replays.next());
+            if (tick == from && from > 0) stream.add(Replays.add(8, new UUID(3, 4), 150, new Pose(500, 64, 0, 0, 0)));
+            if (tick == until) stream.add(Replays.remove(8));
+            stream.add(Replays.moves("minecraft:overworld", new int[] {7, 8}, new Pose[] {
+                new Pose(localActive ? tick * 0.4 : 0, 64, 0, 0, 0),
+                new Pose(500 + (otherActive ? tick * 0.4 : 0), 64, 0, 0, 0)
+            }));
+        }
+        List<Replays.Action> snap = new ArrayList<>(List.of(Replays.login(7), Replays.create(new Pose(0, 64, 0, 0, 0))));
+        if (from == 0) snap.add(Replays.add(8, new UUID(3, 4), 150, new Pose(500, 64, 0, 0, 0)));
+        byte[] chunk = Replays.chunk(snap, stream);
+        return ReplayParser.parse(Replays.files("{\"uuid\":\"u\",\"total_ticks\":500,\"chunks\":{\"c0.flashback\":{}}}",
+            Map.of("c0.flashback", chunk)), 12, new PlayerPacketIds(90, 91, 150));
+    }
+
+    private static CineFileConfig playerCfg(String id) {
+        CineFileConfig c = cfg(10);
+        c.focusPlayer = id;
+        c.styleId = "locked-dolly";
+        c.focusLevel = FocusLevel.CENTER;
+        return c;
+    }
+
+    private static void nearSubject(FakeDriver d, Trajectory subject) {
+        assertFalse(d.committed.isEmpty());
+        for (CameraClip k : d.committed) {
+            Pose p = subject.sample(k.a().tick());
+            assertNotNull(p);
+            assertTrue(Math.hypot(k.a().x() - p.x(), k.a().z() - p.z()) < 20, k.toString());
+        }
+    }
+
+    @Test
+    void namedPlayersDetermineShotLocation() throws Exception {
+        Trajectory t = twoPlayers(true, true, 0, 500);
+        FakeDriver other = new FakeDriver();
+        run(other, t, playerCfg(OTHER), null);
+        nearSubject(other, t.player(OTHER));
+        FakeDriver local = new FakeDriver();
+        run(local, t, playerCfg(LOCAL), null);
+        nearSubject(local, t);
+    }
+
+    @Test
+    void unknownPlayerReportsErrorWithoutShowingShot() throws Exception {
+        String id = "00000000-0000-0005-0000-000000000006";
+        FakeDriver d = new FakeDriver();
+        assertEquals("Player " + id + " isn't in this replay", run(d, twoPlayers(true, true, 0, 500), playerCfg(id), null).result().error());
+        assertTrue(d.shown.isEmpty());
+    }
+
+    @Test
+    void autoFollowsActivePlayerInEitherDirection() throws Exception {
+        for (boolean localActive : new boolean[] {false, true}) {
+            Trajectory t = twoPlayers(localActive, !localActive, 0, 500);
+            FakeDriver d = new FakeDriver();
+            run(d, t, playerCfg("auto"), null);
+            nearSubject(d, localActive ? t : t.player(OTHER));
+        }
+    }
+
+    @Test
+    void verifierChecksNamedSubjectAndPresence() throws Exception {
+        Trajectory t = twoPlayers(true, true, 100, 350);
+        FakeDriver d = new FakeDriver();
+        List<double[]> targets = new ArrayList<>();
+        d.blocked = (from, to) -> { targets.add(to); return false; };
+        run(d, t, playerCfg(OTHER), null);
+        nearSubject(d, t.player(OTHER));
+        assertFalse(targets.isEmpty());
+        for (double[] to : targets) assertTrue(to[0] > 400, java.util.Arrays.toString(to));
+        for (CameraClip k : d.committed) {
+            assertTrue(k.startTick() >= 100);
+            assertTrue(k.endTick() < 350);
+        }
+    }
+
+    @Test
+    void singlePlayerAutoMatchesNamedLocal() throws Exception {
+        Trajectory t = walk();
+        FakeDriver auto = new FakeDriver(), named = new FakeDriver();
+        run(auto, t, playerCfg("auto"), null);
+        run(named, t, playerCfg(t.playerUuid()), null);
+        assertEquals(auto.committed, named.committed);
+    }
+
+    @Test
+    void fixedFocusLevelsSetCameraHeightAndPitch() throws Exception {
+        for (FocusLevel level : List.of(FocusLevel.CENTER, FocusLevel.EYE)) {
+            FakeDriver d = new FakeDriver();
+            run(d, walk(), walkConfig(level), null);
+            assertFalse(d.committed.isEmpty(), level.toString());
+            double y = level == FocusLevel.CENTER ? 64.9 : 65.62;
+            for (CameraClip k : d.committed) {
+                assertEquals(y, k.a().y(), 1e-6);
+                assertEquals(y, k.b().y(), 1e-6);
+                assertEquals(0, k.a().pitch(), 0.01);
+                assertEquals(0, k.b().pitch(), 0.01);
+            }
+        }
+    }
+
+    @Test
+    void autoFocusTriesHigherLevelWhenCenterIsBlocked() throws Exception {
+        FakeDriver d = new FakeDriver();
+        run(d, walk(), walkConfig(FocusLevel.AUTO), null);
+        assertFalse(d.shown.isEmpty());
+        assertEquals(64.9, d.shown.get(0).a().y(), 1e-6);
+
+        FakeDriver blocked = new FakeDriver();
+        blocked.blocked = (from, to) -> from[1] < 65;
+        run(blocked, walk(), walkConfig(FocusLevel.AUTO), null);
+        assertFalse(blocked.committed.isEmpty());
+        assertTrue(blocked.committed.get(0).a().y() >= 65);
+    }
+
+    @Test
+    void jobTunesDistanceToReplayFov() throws Exception {
+        CineFileConfig c = walkConfig(FocusLevel.CENTER);
+        c.styleId = "locked-dolly";
+        FakeDriver narrow = new FakeDriver();
+        narrow.fov = 53;
+        run(narrow, walk(), c, null);
+        FakeDriver wide = new FakeDriver();
+        wide.fov = 90;
+        run(wide, walk(), c, null);
+        assertFalse(narrow.committed.isEmpty());
+        assertFalse(wide.committed.isEmpty());
+        CameraKey a = narrow.committed.get(0).a(), b = wide.committed.get(0).a();
+        double near = Math.hypot(a.x() - 0.4 * a.tick(), a.z());
+        double far = Math.hypot(b.x() - 0.4 * b.tick(), b.z());
+        assertTrue(far < near, far + " < " + near);
+    }
+
+    @Test
+    void autoStyleBalancesSubjectSizeAgainstDistance() throws Exception {
+        FakeDriver d = new FakeDriver();
+        d.fov = 53;
+        run(d, walk(), walkConfig(FocusLevel.CENTER), null);
+        assertFalse(d.shown.isEmpty());
+        assertNotEquals("high-crane", d.shown.get(0).styleId());
     }
 
     static CineFileConfig cfg(double durationS) {

@@ -17,11 +17,12 @@ public final class AutoCreateJob {
 
     private enum State { START, PLANNING, AI_WAIT, PICK, VERIFY, REVIEW, AI_REVIEW }
 
-    private record Variant(CameraClip clip, double mult) {}
+    private record Variant(Trajectory subject, CameraClip clip, double mult) {}
 
     private record Window(int start, int end, double score, List<Variant> variants) {}
 
-    private static final int SLICE_TRIES = 6, FILL_MAX = 20, MIN_REVIEW_SCORE = 4;
+    static final int SLICE_TRIES = 6, FILL_MAX = 20;
+    private static final int MIN_REVIEW_SCORE = 4;
 
     private final ReplayDriver d;
     private final Trajectory t;
@@ -62,7 +63,13 @@ public final class AutoCreateJob {
         this.ai = aiOrNull;
         clipTicks = Math.max(20, (int) Math.round(this.cfg.clipLengthS * 20));
         targetTicks = Math.max(clipTicks, (int) Math.round(this.cfg.durationS * 20));
-        target = Math.max(1, targetTicks / clipTicks);
+        target = targetClips(this.cfg);
+    }
+
+    public static int targetClips(CineFileConfig cfg) {
+        int clipTicks = Math.max(20, (int) Math.round(cfg.clipLengthS * 20));
+        int targetTicks = Math.max(clipTicks, (int) Math.round(cfg.durationS * 20));
+        return Math.max(1, targetTicks / clipTicks);
     }
 
     public void cancel() { cancelled = true; }
@@ -86,9 +93,10 @@ public final class AutoCreateJob {
         switch (state) {
             case START -> {
                 occupied = d.occupiedRanges();
+                double fov = d.fovDegrees();
                 d.status("Planning clips...");
                 List<int[]> occ = new ArrayList<>(occupied);
-                planF = CompletableFuture.supplyAsync(() -> plan(occ));
+                planF = CompletableFuture.supplyAsync(() -> plan(occ, fov));
                 state = State.PLANNING;
             }
             case PLANNING -> {
@@ -153,26 +161,37 @@ public final class AutoCreateJob {
         return cur.variants().get(variant).clip();
     }
 
-    private List<Window> plan(List<int[]> occ) {
-        List<Candidate> cs = Candidates.windows(t, clipTicks, 500, cfg.rejectCuts, cfg.rejectDimensionChanges);
+    private List<Window> plan(List<int[]> occ, double fov) {
+        List<Trajectory> subjects;
+        if ("auto".equals(cfg.focusPlayer)) subjects = t.players();
+        else {
+            Trajectory named = t.player(cfg.focusPlayer);
+            if (named == null) throw new IllegalArgumentException("Player " + cfg.focusPlayer + " isn't in this replay");
+            subjects = List.of(named);
+        }
         List<Style> styles = Styles.resolve(cfg.styleId);
         int perStyle = Styles.triesPerStyle(cfg.tries, styles.size());
         List<Window> out = new ArrayList<>();
-        for (Candidate c : cs) {
-            if (occ.stream().anyMatch(o -> overlaps(c.start(), c.end(), o[0], o[1]))) continue;
-            List<Variant> vs = new ArrayList<>();
-            for (Style s : styles) {
-                for (int i = 0; i < perStyle; i++) {
-                    CameraClip k = CameraSynth.synthesize(t, c.start(), c.end(), Styles.variant(s, i, c.start()), 0);
-                    if (k == null) continue;
-                    FramingStats fs = Framing.stats(t, k, 20);
-                    if (cfg.rejectOffscreenPlayer && fs.onscreenFrac() < 0.5) continue;
-                    vs.add(new Variant(k, Framing.multiplier(fs)));
+        for (Trajectory subject : subjects) {
+            for (Candidate c : Candidates.windows(subject, clipTicks, 500, cfg.rejectCuts, cfg.rejectDimensionChanges)) {
+                if (occ.stream().anyMatch(o -> overlaps(c.start(), c.end(), o[0], o[1]))) continue;
+                List<Variant> vs = new ArrayList<>();
+                for (Style s : styles) {
+                    for (int i = 0; i < perStyle; i++) {
+                        for (FocusLevel level : cfg.focusLevel.candidates()) {
+                            CameraClip k = CameraSynth.synthesize(subject, c.start(), c.end(), Styles.variant(s, i, c.start()), 0, level, fov);
+                            if (k == null) continue;
+                            FramingStats fs = Framing.stats(subject, k, 20, fov);
+                            if (cfg.rejectOffscreenPlayer && fs.onscreenFrac() < 0.5) continue;
+                            double mult = Framing.multiplier(fs) * (0.3 + 0.7 * Framing.sizeScore(subject, k, 20, fov)) * level.weight();
+                            vs.add(new Variant(subject, k, mult));
+                        }
+                    }
                 }
+                if (vs.isEmpty()) continue;
+                vs.sort(Comparator.comparingDouble(Variant::mult).reversed());
+                out.add(new Window(c.start(), c.end(), c.score() * vs.get(0).mult(), vs));
             }
-            if (vs.isEmpty()) continue;
-            vs.sort(Comparator.comparingDouble(Variant::mult).reversed());
-            out.add(new Window(c.start(), c.end(), c.score() * vs.get(0).mult(), vs));
         }
         out.sort(Comparator.comparingDouble(Window::score).reversed());
         return out;
@@ -232,7 +251,7 @@ public final class AutoCreateJob {
     private void startAttempt() {
         CameraClip k = clip();
         handle = d.showCandidate(k);
-        verifier = new ClipVerifier(t, k, handle, cfg);
+        verifier = new ClipVerifier(cur.variants().get(variant).subject(), k, handle, cfg);
         d.status("Checking " + (placed.size() + 1) + "/" + target + ": " + k.styleId());
         state = State.VERIFY;
     }

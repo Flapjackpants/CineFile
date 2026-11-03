@@ -26,6 +26,7 @@ class CineFileConfigTest {
         assertEquals("deepseek-flash", c.model);
         assertEquals("", c.project);
         assertEquals("auto", c.styleId);
+        assertEquals(FocusLevel.AUTO, c.focusLevel);
         assertEquals(0.05, c.maxAiUsd);
         assertEquals(10, c.clipLengthS);
         assertEquals(180, c.durationS);
@@ -41,9 +42,27 @@ class CineFileConfigTest {
     }
 
     @Test
+    void focusPlayerNormalizesUuidOrAuto() {
+        CineFileConfig c = new CineFileConfig();
+        assertEquals("auto", c.focusPlayer);
+        for (String raw : new String[] {" AUTO ", "garbage", "", null}) {
+            c.focusPlayer = raw;
+            c.clamp();
+            assertEquals("auto", c.focusPlayer);
+        }
+        c.focusPlayer = "00000000000000010000000000000002";
+        c.clamp();
+        assertEquals("00000000-0000-0001-0000-000000000002", c.focusPlayer);
+        c.focusPlayer = " ABCDEFAB-CDEF-ABCD-EFAB-CDEFABCDEFAB ";
+        c.clamp();
+        assertEquals("abcdefab-cdef-abcd-efab-cdefabcdefab", c.focusPlayer);
+    }
+
+    @Test
     void saveThenLoadKeepsEveryField() throws Exception {
         CineFileConfig c = new CineFileConfig();
         c.apiKey = "k"; c.baseUrl = "http://x"; c.model = "m"; c.project = "p"; c.styleId = "orbit-reveal";
+        c.focusLevel = FocusLevel.EYE;
         c.maxAiUsd = 1.5; c.clipLengthS = 20; c.durationS = 99; c.teleportBlocks = 30;
         c.think = true; c.visualReview = true;
         c.rejectCuts = false; c.rejectDimensionChanges = false; c.rejectBlockClipping = false; c.rejectBlockedView = false;
@@ -57,6 +76,7 @@ class CineFileConfigTest {
         assertEquals("m", r.model);
         assertEquals("p", r.project);
         assertEquals("orbit-reveal", r.styleId);
+        assertEquals(FocusLevel.EYE, r.focusLevel);
         assertEquals(1.5, r.maxAiUsd);
         assertEquals(20, r.clipLengthS);
         assertEquals(99, r.durationS);
@@ -97,6 +117,12 @@ class CineFileConfigTest {
     @Test
     void unknownStyleBecomesAuto() throws Exception {
         assertEquals("auto", CineFileConfig.load(write("{\"styleId\":\"x\"}")).styleId);
+    }
+
+    @Test
+    void invalidFocusLevelBecomesAuto() throws Exception {
+        assertEquals(FocusLevel.AUTO, CineFileConfig.load(write("{\"focusLevel\":\"x\"}")).focusLevel);
+        assertEquals(FocusLevel.AUTO, CineFileConfig.load(write("{\"focusLevel\":null}")).focusLevel);
     }
 
     @Test

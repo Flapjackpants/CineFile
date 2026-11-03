@@ -5,6 +5,67 @@ import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.Test;
 
 class CameraSynthTest {
+    static Trajectory stationary() throws Exception {
+        return Replays.trajectory(t -> new Pose(0, 64, 0, 0, 0), 31);
+    }
+
+    @Test
+    void fixedLevelsAimAtTheirOwnHeight() throws Exception {
+        Trajectory t = stationary();
+        Style dolly = Styles.resolve("locked-dolly").get(0);
+        for (FocusLevel level : new FocusLevel[] {FocusLevel.CENTER, FocusLevel.EYE, FocusLevel.HIGH, FocusLevel.LOW}) {
+            CameraClip c = CameraSynth.synthesize(t, 0, 30, dolly, 1, level, 53);
+            assertEquals(64 + level.cameraHeight(), c.a().y(), 1e-6);
+            assertEquals(64 + level.cameraHeight(), c.b().y(), 1e-6);
+            assertEquals(c.a().yaw(), c.b().yaw(), 1e-6);
+            assertEquals(c.a().pitch(), c.b().pitch(), 1e-6);
+            assertEquals(dolly.id(), c.styleId());
+            if (level == FocusLevel.HIGH) assertTrue(c.a().pitch() > 0);
+            else if (level == FocusLevel.LOW) assertTrue(c.a().pitch() < 0);
+            else assertEquals(0, c.a().pitch(), 1e-6);
+        }
+        CameraClip high70 = CameraSynth.synthesize(t, 0, 30, dolly, 1, FocusLevel.HIGH, 70);
+        assertEquals(64 + 0.9 + 2.1 * Styles.fovScale(70), high70.a().y(), 1e-6);
+    }
+
+    @Test
+    void orbitAndJitterUseFixedLevel() throws Exception {
+        Trajectory t = stationary();
+        Style orbit = Styles.resolve("orbit-reveal").get(0);
+        CameraClip c = CameraSynth.synthesize(t, 0, 30, orbit, 0, FocusLevel.CENTER, 53);
+        assertEquals(64.9, c.a().y(), 1e-6);
+        assertEquals(64.9, c.b().y(), 1e-6);
+        assertEquals(wrap(c.a().yaw() + Styles.tuned(orbit, 53).orbitDegrees()), c.b().yaw(), 1e-6);
+        Style jitter = Styles.variant(Styles.resolve("locked-dolly").get(0), 3, 40);
+        CameraClip fixed = CameraSynth.synthesize(t, 0, 30, jitter, 0, FocusLevel.CENTER, 53);
+        assertEquals(64.9, fixed.a().y(), 1e-6);
+        assertEquals(0, fixed.a().pitch(), 1e-6);
+    }
+
+    @Test
+    void lockedKeysKeepFirstAimDespiteMotion() throws Exception {
+        Trajectory t = Replays.trajectory(tick -> new Pose(0, 64 + tick / 10.0, 0, tick, 0), 31);
+        Style locked = Styles.resolve("locked-dolly").get(0);
+        CameraClip dolly = CameraSynth.synthesize(t, 0, 30, locked, 0, FocusLevel.HIGH, 53);
+        assertEquals(dolly.a().yaw(), dolly.b().yaw(), 1e-6);
+        assertEquals(dolly.a().pitch(), dolly.b().pitch(), 1e-6);
+    }
+
+    private static double wrap(double degrees) {
+        return (degrees + 540) % 360 - 180;
+    }
+
+    @Test
+    void styleMatchesLegacySynthesisAndAutoNeedsExpansion() throws Exception {
+        Trajectory t = stationary();
+        for (Style s : Styles.all()) {
+            assertEquals(CameraSynth.synthesize(t, 0, 30, Styles.tuned(s, 53), 1),
+                    CameraSynth.synthesize(t, 0, 30, s, 1, FocusLevel.STYLE, 53));
+        }
+        Style s = Styles.all().get(0);
+        assertThrows(IllegalArgumentException.class, () -> CameraSynth.synthesize(t, 0, 30, s, 0, FocusLevel.AUTO, 53));
+        assertNull(CameraSynth.synthesize(t, -1, 30, s, 0, FocusLevel.CENTER, 53));
+    }
     static final String[] IDS = {"hero-low", "high-crane", "locked-dolly", "orbit-reveal", "side-track"};
 
     // cinefile.camera.synthesize_clip on a player at x=+/-0.5*t, y=64, z=0, yaw=30+t, pitch=5, clip 0..30, score 1.5

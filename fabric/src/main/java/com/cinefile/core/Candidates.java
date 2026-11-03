@@ -32,6 +32,7 @@ public final class Candidates {
         TreeSet<Integer> b = new TreeSet<>();
         if (cuts) b.addAll(t.cuts());
         if (dims) b.addAll(t.dimensionChanges());
+        b.addAll(t.presenceBreaks());
         return b;
     }
 
@@ -70,6 +71,7 @@ public final class Candidates {
                 int b = a + clipTicks;
                 Integer hit = bounds.higher(a);
                 if (hit != null && hit <= b) continue;
+                if (t.poses().subMap(a, true, b, true).isEmpty()) continue;
                 out.add(new Candidate(a, b, activityScore(t, a, b)));
             }
         }
