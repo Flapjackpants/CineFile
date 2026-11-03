@@ -9,7 +9,9 @@
     "TimelineWindowMixin",
     "TimelineWindowAccessor",
     "ReplayServerAccessor",
-    "ReplayGamePacketHandlerMixin"
+    "ReplayGamePacketHandlerMixin",
+    "SoundEngineMixin",
+    "SoundBufferLibraryMixin"
   ],
   "injectors": {
     "defaultRequire": 1

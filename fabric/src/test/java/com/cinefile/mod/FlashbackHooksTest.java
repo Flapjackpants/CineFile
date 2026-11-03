@@ -43,6 +43,17 @@ class FlashbackHooksTest {
     }
 
     @Test
+    void cutMuteSoundTargetsExist() throws Exception {
+        Class<?> soundInstance = load("net.minecraft.client.resources.sounds.SoundInstance");
+        Class<?> engine = load("net.minecraft.client.sounds.SoundEngine");
+        assertNotNull(engine.getDeclaredMethod("play", soundInstance));
+        assertNotNull(engine.getDeclaredMethod("playDelayed", soundInstance, int.class));
+        assertNotNull(engine.getDeclaredMethod("stop", soundInstance));
+        assertNotNull(load("net.minecraft.client.sounds.SoundBufferLibrary")
+                .getDeclaredMethod("getStream", load("net.minecraft.resources.Identifier"), boolean.class));
+    }
+
+    @Test
     void cutSoundHandlerTargetsExist() throws Exception {
         String p = "com.moulberry.flashback.playback.";
         Class<?> handler = load(p + "ReplayGamePacketHandler");

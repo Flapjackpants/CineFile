@@ -24,5 +24,6 @@ public class CineFileClient implements ClientModInitializer {
     public void onInitializeClient() {
         config = CineFileConfig.load(configPath());
         ClientTickEvents.END_CLIENT_TICK.register(mc -> AutoCreateController.tick());
+        CutSoundMute.register();
     }
 }
