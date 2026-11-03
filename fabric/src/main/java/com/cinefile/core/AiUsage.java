@@ -17,6 +17,10 @@ public final class AiUsage {
     public synchronized int out() { return out; }
 
     public synchronized double estimateUsd() {
+        return cost(in, out);
+    }
+
+    static double cost(int in, int out) {
         return in / 1_000_000.0 * PRICE_IN + out / 1_000_000.0 * PRICE_OUT;
     }
 }

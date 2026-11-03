@@ -21,7 +21,8 @@ public final class AutoCreateJob {
 
     private record Window(int start, int end, double score, List<Variant> variants) {}
 
-    private static final int SLICE_TRIES = 6, FILL_MAX = 20, MIN_REVIEW_SCORE = 4;
+    static final int SLICE_TRIES = 6, FILL_MAX = 20;
+    private static final int MIN_REVIEW_SCORE = 4;
 
     private final ReplayDriver d;
     private final Trajectory t;
@@ -62,7 +63,13 @@ public final class AutoCreateJob {
         this.ai = aiOrNull;
         clipTicks = Math.max(20, (int) Math.round(this.cfg.clipLengthS * 20));
         targetTicks = Math.max(clipTicks, (int) Math.round(this.cfg.durationS * 20));
-        target = Math.max(1, targetTicks / clipTicks);
+        target = targetClips(this.cfg);
+    }
+
+    public static int targetClips(CineFileConfig cfg) {
+        int clipTicks = Math.max(20, (int) Math.round(cfg.clipLengthS * 20));
+        int targetTicks = Math.max(clipTicks, (int) Math.round(cfg.durationS * 20));
+        return Math.max(1, targetTicks / clipTicks);
     }
 
     public void cancel() { cancelled = true; }

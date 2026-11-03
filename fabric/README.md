@@ -19,7 +19,7 @@ Flashback isn't bundled. It's downloaded at build time.
 
 ## Use
 
-Open a replay in Flashback and click **Auto Create** in the top row. Clips appear as they are verified. The button shows `Cancel (placed/target)` while it runs.
+Open a replay in Flashback and click **Auto Create** in the top row. A dialog shows the clip count, estimated cost, and a budget for this run. Click **Start** to begin. Clips appear as they are verified. The button shows `Cancel (placed/target)` while it runs. The budget starts at **Max spend** and does not change that setting.
 
 Existing tracks are kept, and only empty time is used. Each placed clip can be undone on its own.
 
@@ -64,7 +64,7 @@ Open settings through Mod Menu.
 | API key | Key for your AI provider. Leave blank to use heuristics only. |
 | Base URL | Any OpenAI-compatible API. DeepSeek by default. |
 | Model | Model name sent to the API. |
-| Max spend | Spend cap, estimated at DeepSeek prices. |
+| Max spend | Default budget for each run, estimated at DeepSeek prices. |
 | Think harder | Lets the model use its default reasoning effort instead of low, which costs more. |
 | Screenshot review | Sends screenshots to the model for review. Off by default. |
 | Project | Your project description, sent to the API. |

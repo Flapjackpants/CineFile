@@ -1,5 +1,7 @@
 package com.cinefile.mod;
 
+import com.cinefile.core.CineFileConfig;
+import com.cinefile.core.CostEstimate;
 import com.moulberry.flashback.Flashback;
 import com.moulberry.flashback.editor.ui.ImGuiHelper;
 import com.moulberry.flashback.editor.ui.ReplayUI;
@@ -9,9 +11,14 @@ import com.moulberry.flashback.state.EditorStateManager;
 import imgui.moulberry90.ImGui;
 import imgui.moulberry90.flag.ImGuiPopupFlags;
 import imgui.moulberry90.flag.ImGuiWindowFlags;
+import imgui.moulberry90.type.ImDouble;
+import java.util.Locale;
 
 public final class CineFileMenu {
     private static boolean openDialog;
+    private static boolean openAutoDialog;
+    private static CostEstimate costEstimate;
+    private static final ImDouble budget = new ImDouble();
 
     private CineFileMenu() {}
 
@@ -41,7 +48,10 @@ public final class CineFileMenu {
             if (ImGui.menuItem(AutoCreateController.progressLabel() + "###CineFileAuto")) AutoCreateController.cancel();
             ImGui.textDisabled(AutoCreateController.statusLine());
         } else if (ImGui.menuItem("Auto Create##CineFile", "", false, !Flashback.isExporting())) {
-            AutoCreateController.start();
+            CineFileConfig cfg = CineFileClient.config();
+            costEstimate = CostEstimate.of(cfg);
+            budget.set(cfg.maxAiUsd);
+            openAutoDialog = true;
         }
         boolean cutEnabled = !running && !Flashback.isExporting();
         if (ImGui.menuItem("Cut##CineFile", "", false, cutEnabled)) {
@@ -77,6 +87,36 @@ public final class CineFileMenu {
         }
         if (ImGui.menuItem("Delete All##CineFile", "", false, !running && (tracks > 0 || hasRange))) {
             openDialog = true;
+        }
+
+        if (openAutoDialog) {
+            ImGui.openPopup("###CineFileAutoCreate");
+            openAutoDialog = false;
+        }
+        if (ImGuiHelper.beginPopupModalCloseable("Auto Create###CineFileAutoCreate", ImGuiWindowFlags.AlwaysAutoResize)) {
+            CineFileConfig cfg = CineFileClient.config();
+            ImGui.text(String.format(Locale.ROOT, "Clips: %d at %ss each", costEstimate.clips(), cfg.clipLengthS));
+            if (cfg.apiKey.isBlank()) {
+                ImGui.text("No API key set: heuristics only, no AI cost.");
+            } else {
+                ImGui.text("Model: " + cfg.model);
+                ImGui.text("Screenshot review: " + (cfg.visualReview ? "on" : "off"));
+                ImGui.text(String.format(Locale.ROOT, "Estimated cost: ~$%.4f", costEstimate.typicalUsd()));
+                if (cfg.visualReview) ImGui.text(String.format(Locale.ROOT,
+                    "Worst case: ~$%.4f, stopped by your budget", costEstimate.worstUsd()));
+                ImGui.inputDouble("Budget (USD)##CineFileBudget", budget, 0.01, 0.1, "%.4f");
+                ImGui.text("Estimated at DeepSeek prices. Think harder can cost more.");
+                if (budget.get() < costEstimate.typicalUsd()) {
+                    ImGui.text("Below the estimate: AI stops at the budget, and remaining clips use heuristics.");
+                }
+            }
+            if (ImGui.button("Start")) {
+                AutoCreateController.start(budget.get());
+                ImGui.closeCurrentPopup();
+            }
+            ImGui.sameLine();
+            if (ImGui.button("Cancel")) ImGui.closeCurrentPopup();
+            ImGuiHelper.endPopupModalCloseable();
         }
 
         if (openDialog) {

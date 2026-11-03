@@ -41,7 +41,7 @@ public final class AutoCreateController {
         return driver != null ? driver.status() : "Reading replay...";
     }
 
-    public static void start() {
+    public static void start(double budgetUsd) {
         if (isRunning() || Flashback.isExporting()) return;
         ReplayServer s = Flashback.getReplayServer();
         EditorState e = EditorStateManager.getCurrent();
@@ -49,7 +49,7 @@ public final class AutoCreateController {
         server = s;
         state = e;
         cfg = CineFileClient.config();
-        ai = cfg.apiKey.isBlank() ? null : new AiClient(cfg.apiKey, cfg.baseUrl, cfg.model, cfg.maxAiUsd, cfg.think);
+        ai = cfg.apiKey.isBlank() ? null : new AiClient(cfg.apiKey, cfg.baseUrl, cfg.model, Math.max(0, budgetUsd), cfg.think);
         parseCancelled = false;
         driver = null;
         double teleport = cfg.teleportBlocks;

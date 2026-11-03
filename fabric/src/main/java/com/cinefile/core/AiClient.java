@@ -22,6 +22,11 @@ import java.util.logging.Logger;
 public final class AiClient implements ShotAi {
     private static final Logger LOGGER = Logger.getLogger("cinefile");
     private static final int IMAGE_TOKENS = 1024;
+    static final int REVIEW_EST_OUT = 320;
+
+    static int planEstIn(int pool) { return 800 + pool * 25; }
+    static int planEstOut(int target) { return 200 + target * 3; }
+    static int reviewEstIn(int frames) { return 600 + IMAGE_TOKENS * frames; }
     private static final String REVIEW_SYSTEM = "You judge Minecraft cinematic camera shots from screenshots of the real game. "
         + "The frames are the start, middle and end of one shot. Score it 0-10: the player is visible and at the center "
         + "or on rule-of-thirds points in most frames; the camera is not inside or behind blocks; the composition reads "
@@ -81,7 +86,7 @@ public final class AiClient implements ShotAi {
             fail(base == null ? "Base URL not allowed" : "No API key");
             return CompletableFuture.completedFuture(Optional.empty());
         }
-        if (usage.estimateUsd() + estIn / 1e6 * AiUsage.PRICE_IN + estOut / 1e6 * AiUsage.PRICE_OUT > maxUsd) {
+        if (usage.estimateUsd() + AiUsage.cost(estIn, estOut) > maxUsd) {
             fail("Over budget");
             return CompletableFuture.completedFuture(Optional.empty());
         }
@@ -170,7 +175,7 @@ public final class AiClient implements ShotAi {
             + "Reply with ONLY JSON: {\"indices\": [int, ...]}. "
             + "Cover representative phases of the project; avoid clustering; never pick overlapping windows."));
         messages.add(msg("user", payload.toString()));
-        return chat(messages, 800 + pool.size() * 25, 200 + targetClips * 3).thenApply(content -> {
+        return chat(messages, planEstIn(pool.size()), planEstOut(targetClips)).thenApply(content -> {
             if (content.isEmpty()) return Optional.<List<Integer>>empty();
             JsonObject parsed = extractJson(content.get());
             if (parsed == null) return Optional.<List<Integer>>empty();
@@ -206,7 +211,7 @@ public final class AiClient implements ShotAi {
         JsonArray messages = new JsonArray();
         messages.add(msg("system", REVIEW_SYSTEM));
         messages.add(msg("user", parts));
-        return chat(messages, 600 + IMAGE_TOKENS * pngFrames.size(), 320).thenApply(content -> {
+        return chat(messages, reviewEstIn(pngFrames.size()), REVIEW_EST_OUT).thenApply(content -> {
             if (content.isEmpty()) return Optional.<Double>empty();
             JsonObject parsed = extractJson(content.get());
             if (parsed == null) return Optional.<Double>empty();
