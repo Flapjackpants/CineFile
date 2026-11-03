@@ -85,6 +85,8 @@ public class SettingsScreen extends Screen {
         }), c.focusLevel).withValues(FocusLevel.values()).displayOnlyValue()
             .create(0, 0, WIDGET_WIDTH, 20, Component.literal("Focus level"), (b, v) -> c.focusLevel = v));
         focus.setTooltip(Tooltip.create(Component.literal("Height the camera sits and aims at. Auto tries each level and keeps the best shot that passes the checks. Distances adjust to your FOV automatically")));
+        EditBox player = l.text("Focus player", c.focusPlayer, 64, v -> c.focusPlayer = v);
+        player.setTooltip(Tooltip.create(Component.literal("A player's UUID, or auto for the most cinematic player in each shot")));
         l.number("Tries per clip", () -> c.tries, v -> c.tries = (int) Math.round(v));
 
         l.header("Clip checks");

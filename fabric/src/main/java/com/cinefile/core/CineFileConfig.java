@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Set;
+import java.util.Locale;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,6 +23,7 @@ public final class CineFileConfig {
     public int tries = 5, checkEveryTicks = 10, cutLengthTicks = 0;
     public GapFill gapFill = GapFill.CUT;
     public FocusLevel focusLevel = FocusLevel.AUTO;
+    public String focusPlayer = "auto";
 
     private static final Logger LOGGER = LoggerFactory.getLogger("cinefile");
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -70,6 +72,12 @@ public final class CineFileConfig {
         if (styleId == null || !STYLES.contains(styleId)) styleId = d.styleId;
         if (gapFill == null) gapFill = d.gapFill;
         if (focusLevel == null) focusLevel = d.focusLevel;
+        focusPlayer = focusPlayer == null ? "auto" : focusPlayer.trim().toLowerCase(Locale.ROOT);
+        if (focusPlayer.matches("[0-9a-f]{32}")) {
+            focusPlayer = focusPlayer.substring(0, 8) + "-" + focusPlayer.substring(8, 12) + "-"
+                + focusPlayer.substring(12, 16) + "-" + focusPlayer.substring(16, 20) + "-" + focusPlayer.substring(20);
+        }
+        if (!focusPlayer.equals("auto") && !focusPlayer.matches("[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}")) focusPlayer = "auto";
         maxAiUsd = Math.clamp(maxAiUsd, 0, 100);
         clipLengthS = Math.clamp(clipLengthS, 1, 600);
         durationS = Math.clamp(durationS, 1, 36000);

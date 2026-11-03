@@ -70,6 +70,7 @@ Open settings through Mod Menu.
 | Total duration | Target length of the whole scene. |
 | Style | Shot style. `auto` by default. |
 | Focus level | `Auto` tries player center, eye level, high angle, and low angle, then keeps the best shot that passes checks. You can also fix one of those levels or choose the style preset. |
+| Focus player | `auto` compares every player the recording saw, shot by shot. A player can only be filmed while they were near the recording player. Enter a UUID to follow one player; a UUID absent from the replay stops the run with an error. |
 | Tries per clip | How many candidates to try per clip. 5 by default; Auto also tries each candidate at every focus level. |
 | Fill gaps with | What goes between placed clips: a cut, a 1-second timelapse, or nothing. |
 | Cut length | Length in ticks of newly made cuts. See above. |

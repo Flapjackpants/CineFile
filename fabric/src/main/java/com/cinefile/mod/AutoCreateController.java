@@ -5,6 +5,7 @@ import com.cinefile.core.AutoCreateJob;
 import com.cinefile.core.CineFileConfig;
 import com.cinefile.core.FsReplayFiles;
 import com.cinefile.core.ReplayParser;
+import com.cinefile.core.PlayerPacketIds;
 import com.cinefile.core.Summary;
 import com.cinefile.core.Trajectory;
 import com.cinefile.mixin.ReplayServerAccessor;
@@ -53,9 +54,17 @@ public final class AutoCreateController {
         driver = null;
         double teleport = cfg.teleportBlocks;
         FsReplayFiles files = new FsReplayFiles(((ReplayServerAccessor) s).cinefile$fileSystem());
+        PlayerPacketIds ids;
+        try {
+            ids = PlayerPackets.current();
+        } catch (RuntimeException ex) {
+            CineFileClient.LOGGER.warn("CineFile: could not resolve player packet ids", ex);
+            ids = null;
+        }
+        PlayerPacketIds parseIds = ids;
         parse = CompletableFuture.supplyAsync(() -> {
             try {
-                return ReplayParser.parse(files, teleport);
+                return ReplayParser.parse(files, teleport, parseIds);
             } catch (java.io.IOException ex) {
                 throw new java.io.UncheckedIOException(ex);
             }

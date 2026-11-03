@@ -17,7 +17,7 @@ public final class AutoCreateJob {
 
     private enum State { START, PLANNING, AI_WAIT, PICK, VERIFY, REVIEW, AI_REVIEW }
 
-    private record Variant(CameraClip clip, double mult) {}
+    private record Variant(Trajectory subject, CameraClip clip, double mult) {}
 
     private record Window(int start, int end, double score, List<Variant> variants) {}
 
@@ -155,28 +155,36 @@ public final class AutoCreateJob {
     }
 
     private List<Window> plan(List<int[]> occ, double fov) {
-        List<Candidate> cs = Candidates.windows(t, clipTicks, 500, cfg.rejectCuts, cfg.rejectDimensionChanges);
+        List<Trajectory> subjects;
+        if ("auto".equals(cfg.focusPlayer)) subjects = t.players();
+        else {
+            Trajectory named = t.player(cfg.focusPlayer);
+            if (named == null) throw new IllegalArgumentException("Player " + cfg.focusPlayer + " isn't in this replay");
+            subjects = List.of(named);
+        }
         List<Style> styles = Styles.resolve(cfg.styleId);
         int perStyle = Styles.triesPerStyle(cfg.tries, styles.size());
         List<Window> out = new ArrayList<>();
-        for (Candidate c : cs) {
-            if (occ.stream().anyMatch(o -> overlaps(c.start(), c.end(), o[0], o[1]))) continue;
-            List<Variant> vs = new ArrayList<>();
-            for (Style s : styles) {
-                for (int i = 0; i < perStyle; i++) {
-                    for (FocusLevel level : cfg.focusLevel.candidates()) {
-                        CameraClip k = CameraSynth.synthesize(t, c.start(), c.end(), Styles.variant(s, i, c.start()), 0, level, fov);
-                        if (k == null) continue;
-                        FramingStats fs = Framing.stats(t, k, 20, fov);
-                        if (cfg.rejectOffscreenPlayer && fs.onscreenFrac() < 0.5) continue;
-                        double mult = Framing.multiplier(fs) * (0.3 + 0.7 * Framing.sizeScore(t, k, 20, fov)) * level.weight();
-                        vs.add(new Variant(k, mult));
+        for (Trajectory subject : subjects) {
+            for (Candidate c : Candidates.windows(subject, clipTicks, 500, cfg.rejectCuts, cfg.rejectDimensionChanges)) {
+                if (occ.stream().anyMatch(o -> overlaps(c.start(), c.end(), o[0], o[1]))) continue;
+                List<Variant> vs = new ArrayList<>();
+                for (Style s : styles) {
+                    for (int i = 0; i < perStyle; i++) {
+                        for (FocusLevel level : cfg.focusLevel.candidates()) {
+                            CameraClip k = CameraSynth.synthesize(subject, c.start(), c.end(), Styles.variant(s, i, c.start()), 0, level, fov);
+                            if (k == null) continue;
+                            FramingStats fs = Framing.stats(subject, k, 20, fov);
+                            if (cfg.rejectOffscreenPlayer && fs.onscreenFrac() < 0.5) continue;
+                            double mult = Framing.multiplier(fs) * (0.3 + 0.7 * Framing.sizeScore(subject, k, 20, fov)) * level.weight();
+                            vs.add(new Variant(subject, k, mult));
+                        }
                     }
                 }
+                if (vs.isEmpty()) continue;
+                vs.sort(Comparator.comparingDouble(Variant::mult).reversed());
+                out.add(new Window(c.start(), c.end(), c.score() * vs.get(0).mult(), vs));
             }
-            if (vs.isEmpty()) continue;
-            vs.sort(Comparator.comparingDouble(Variant::mult).reversed());
-            out.add(new Window(c.start(), c.end(), c.score() * vs.get(0).mult(), vs));
         }
         out.sort(Comparator.comparingDouble(Window::score).reversed());
         return out;
@@ -236,7 +244,7 @@ public final class AutoCreateJob {
     private void startAttempt() {
         CameraClip k = clip();
         handle = d.showCandidate(k);
-        verifier = new ClipVerifier(t, k, handle, cfg);
+        verifier = new ClipVerifier(cur.variants().get(variant).subject(), k, handle, cfg);
         d.status("Checking " + (placed.size() + 1) + "/" + target + ": " + k.styleId());
         state = State.VERIFY;
     }

@@ -42,6 +42,23 @@ class CineFileConfigTest {
     }
 
     @Test
+    void focusPlayerNormalizesUuidOrAuto() {
+        CineFileConfig c = new CineFileConfig();
+        assertEquals("auto", c.focusPlayer);
+        for (String raw : new String[] {" AUTO ", "garbage", "", null}) {
+            c.focusPlayer = raw;
+            c.clamp();
+            assertEquals("auto", c.focusPlayer);
+        }
+        c.focusPlayer = "00000000000000010000000000000002";
+        c.clamp();
+        assertEquals("00000000-0000-0001-0000-000000000002", c.focusPlayer);
+        c.focusPlayer = " ABCDEFAB-CDEF-ABCD-EFAB-CDEFABCDEFAB ";
+        c.clamp();
+        assertEquals("abcdefab-cdef-abcd-efab-cdefabcdefab", c.focusPlayer);
+    }
+
+    @Test
     void saveThenLoadKeepsEveryField() throws Exception {
         CineFileConfig c = new CineFileConfig();
         c.apiKey = "k"; c.baseUrl = "http://x"; c.model = "m"; c.project = "p"; c.styleId = "orbit-reveal";
