@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.IntFunction;
 
 /** Builds synthetic Flashback chunks and replay file sets for tests. */
@@ -41,20 +42,52 @@ final class Replays {
     }
 
     static Action move(String level, int eid, Pose p) throws IOException {
+        return moves(level, new int[] {eid}, new Pose[] {p});
+    }
+
+    static Action moves(String level, int[] eids, Pose[] poses) throws IOException {
         ByteArrayOutputStream b = new ByteArrayOutputStream();
         DataOutputStream o = new DataOutputStream(b);
         varint(o, 1);
         ident(o, level);
-        varint(o, 1);
+        varint(o, eids.length);
+        for (int i = 0; i < eids.length; i++) {
+            Pose p = poses[i];
+            varint(o, eids[i]);
+            o.writeDouble(p.x());
+            o.writeDouble(p.y());
+            o.writeDouble(p.z());
+            o.writeFloat((float) p.yaw());
+            o.writeFloat((float) p.pitch());
+            o.writeFloat((float) p.yaw());
+            o.writeBoolean(true);
+        }
+        return new Action(MOVE, b.toByteArray());
+    }
+
+    static Action add(int eid, UUID uuid, int type, Pose p) throws IOException {
+        ByteArrayOutputStream b = new ByteArrayOutputStream();
+        DataOutputStream o = new DataOutputStream(b);
+        varint(o, 90);
         varint(o, eid);
+        o.writeLong(uuid.getMostSignificantBits());
+        o.writeLong(uuid.getLeastSignificantBits());
+        varint(o, type);
         o.writeDouble(p.x());
         o.writeDouble(p.y());
         o.writeDouble(p.z());
-        o.writeFloat((float) p.yaw());
-        o.writeFloat((float) p.pitch());
-        o.writeFloat((float) p.yaw());
-        o.writeBoolean(true);
-        return new Action(MOVE, b.toByteArray());
+        o.write(new byte[] {1, 2, 3});
+        return new Action(PACKET, b.toByteArray());
+    }
+
+    static Action remove(int... eids) throws IOException {
+        ByteArrayOutputStream b = new ByteArrayOutputStream();
+        DataOutputStream o = new DataOutputStream(b);
+        varint(o, 91);
+        varint(o, eids.length);
+        for (int eid : eids) varint(o, eid);
+        o.write(new byte[] {1, 2, 3});
+        return new Action(PACKET, b.toByteArray());
     }
 
     static Action create(Pose p) throws IOException {
