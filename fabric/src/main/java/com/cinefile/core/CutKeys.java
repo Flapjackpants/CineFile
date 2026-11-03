@@ -22,6 +22,17 @@ public final class CutKeys {
         return speed >= CUT_TICKRATE / 20f;
     }
 
+    public static boolean contains(List<int[]> ranges, int tick) {
+        for (int[] range : ranges) {
+            if (range[0] <= tick && tick < range[1]) return true;
+        }
+        return false;
+    }
+
+    public static boolean markerDue(boolean wasMuted, boolean muted, int sentTick, int tick) {
+        return muted != wasMuted || (muted && tick != sentTick);
+    }
+
     public static List<int[]> gaps(List<int[]> ranges, int minGap) {
         List<int[]> sorted = new ArrayList<>();
         for (int[] range : ranges) sorted.add(range.clone());

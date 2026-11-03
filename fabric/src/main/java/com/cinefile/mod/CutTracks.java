@@ -44,15 +44,17 @@ public final class CutTracks {
                 || CutKeys.isCut(((TimelapseKeyframe) t.keyframesByTick.firstEntry().getValue()).ticks));
     }
 
-    public static boolean isMuted(EditorState state, int tick) {
-        if (state == null) return false;
+    public static List<int[]> cutRanges(EditorState state) {
+        if (state == null) return List.of();
         long stamp = state.acquireRead();
         try {
+            List<int[]> ranges = new ArrayList<>();
             for (KeyframeTrack track : state.getCurrentScene(stamp).keyframeTracks) {
-                if (track.enabled && isCut(track)
-                        && track.keyframesByTick.firstKey() <= tick && tick < track.keyframesByTick.lastKey()) return true;
+                if (track.enabled && isCut(track)) {
+                    ranges.add(new int[] {track.keyframesByTick.firstKey(), track.keyframesByTick.lastKey()});
+                }
             }
-            return false;
+            return ranges;
         } finally {
             state.release(stamp);
         }

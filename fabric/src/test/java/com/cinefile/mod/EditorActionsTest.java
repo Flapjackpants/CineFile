@@ -2,6 +2,7 @@ package com.cinefile.mod;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.cinefile.core.CutKeys;
 import com.moulberry.flashback.keyframe.impl.CameraKeyframe;
 import com.moulberry.flashback.keyframe.impl.TimelapseKeyframe;
 import com.moulberry.flashback.keyframe.types.CameraKeyframeType;
@@ -17,19 +18,19 @@ import org.junit.jupiter.api.Test;
 class EditorActionsTest {
     @Test
     void cutSoundMuteUsesEnabledCutRangesOnly() {
-        assertFalse(CutTracks.isMuted(null, 150));
+        assertTrue(CutTracks.cutRanges(null).isEmpty());
         EditorState s = new EditorState();
         CutTracks.add(s, 100, 200, 0);
-        assertFalse(CutTracks.isMuted(s, 99));
-        assertTrue(CutTracks.isMuted(s, 100));
-        assertTrue(CutTracks.isMuted(s, 199));
-        assertFalse(CutTracks.isMuted(s, 200));
+        assertFalse(muted(s, 99));
+        assertTrue(muted(s, 100));
+        assertTrue(muted(s, 199));
+        assertFalse(muted(s, 200));
 
         CutTracks.add(s, 300, 305, 5);
-        assertTrue(CutTracks.isMuted(s, 150));
-        assertTrue(CutTracks.isMuted(s, 300));
-        assertTrue(CutTracks.isMuted(s, 304));
-        assertFalse(CutTracks.isMuted(s, 305));
+        assertTrue(muted(s, 150));
+        assertTrue(muted(s, 300));
+        assertTrue(muted(s, 304));
+        assertFalse(muted(s, 305));
 
         CutTracks.addTimelapse(s, 400, 500, 5);
         long st = s.acquireWrite();
@@ -37,10 +38,14 @@ class EditorActionsTest {
         sc.keyframeTracks.add(camera(600, 700, false, true));
         sc.keyframeTracks.get(1).enabled = false;
         s.release(st);
-        assertFalse(CutTracks.isMuted(s, 150));
-        assertFalse(CutTracks.isMuted(s, 450));
-        assertFalse(CutTracks.isMuted(s, 650));
-        assertTrue(CutTracks.isMuted(s, 302));
+        assertFalse(muted(s, 150));
+        assertFalse(muted(s, 450));
+        assertFalse(muted(s, 650));
+        assertTrue(muted(s, 302));
+    }
+
+    private static boolean muted(EditorState state, int tick) {
+        return CutKeys.contains(CutTracks.cutRanges(state), tick);
     }
 
     private static KeyframeTrack camera(int a, int b, boolean orbit, boolean enabled) {

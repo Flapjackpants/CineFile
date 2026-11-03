@@ -41,6 +41,25 @@ class CutKeysTest {
     }
 
     @Test
+    void containsUsesHalfOpenRanges() {
+        List<int[]> ranges = List.of(new int[] {10, 20}, new int[] {30, 40});
+        assertTrue(CutKeys.contains(ranges, 10));
+        assertFalse(CutKeys.contains(ranges, 20));
+        assertFalse(CutKeys.contains(ranges, 25));
+        assertTrue(CutKeys.contains(ranges, 35));
+        assertFalse(CutKeys.contains(List.of(), 10));
+    }
+
+    @Test
+    void markerDueOnlyOnChangeOrNewTickInsideCut() {
+        assertFalse(CutKeys.markerDue(false, false, 0, 5));
+        assertTrue(CutKeys.markerDue(false, true, 0, 5));
+        assertTrue(CutKeys.markerDue(true, false, 5, 6));
+        assertFalse(CutKeys.markerDue(true, true, 5, 5));
+        assertTrue(CutKeys.markerDue(true, true, 5, 6));
+    }
+
+    @Test
     void rangeFromPlayhead() {
         assertArrayEquals(new int[] {50, 150}, CutKeys.rangeFromPlayhead(50, 1000));
         assertArrayEquals(new int[] {950, 1000}, CutKeys.rangeFromPlayhead(950, 1000));

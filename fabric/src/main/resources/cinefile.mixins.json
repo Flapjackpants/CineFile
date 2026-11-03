@@ -9,7 +9,7 @@
     "TimelineWindowMixin",
     "TimelineWindowAccessor",
     "ReplayServerAccessor",
-    "ReplayGamePacketHandlerMixin",
+    "ReplayServerMixin",
     "SoundEngineMixin",
     "SoundBufferLibraryMixin"
   ],

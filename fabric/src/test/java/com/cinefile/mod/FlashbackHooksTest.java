@@ -9,7 +9,6 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
 import org.junit.jupiter.api.Test;
 
 class FlashbackHooksTest {
@@ -54,14 +53,12 @@ class FlashbackHooksTest {
     }
 
     @Test
-    void cutSoundHandlerTargetsExist() throws Exception {
-        String p = "com.moulberry.flashback.playback.";
-        Class<?> handler = load(p + "ReplayGamePacketHandler");
-        assertEquals(load(p + "ReplayServer"), handler.getDeclaredField("replayServer").getType());
-        assertEquals(int.class, load(p + "ReplayServer").getDeclaredField("currentTick").getType());
-        String packets = "net.minecraft.network.protocol.game.";
+    void cutMuteServerTargetsExist() throws Exception {
+        Class<?> server = load("com.moulberry.flashback.playback.ReplayServer");
+        assertEquals(int.class, server.getDeclaredField("currentTick").getType());
+        assertNotNull(server.getDeclaredMethod("getReplayViewers"));
         Set<String> methods = new HashSet<>();
-        try (InputStream in = handler.getResourceAsStream("ReplayGamePacketHandler.class")) {
+        try (InputStream in = server.getResourceAsStream("ReplayServer.class")) {
             assertNotNull(in);
             new ClassReader(in).accept(new ClassVisitor(Opcodes.ASM9) {
                 @Override
@@ -71,9 +68,7 @@ class FlashbackHooksTest {
                 }
             }, ClassReader.SKIP_CODE);
         }
-        assertTrue(methods.contains("handleSoundEvent(" + Type.getDescriptor(load(packets + "ClientboundSoundPacket")) + ")V"));
-        assertTrue(methods.contains("handleSoundEntityEvent(" + Type.getDescriptor(load(packets + "ClientboundSoundEntityPacket")) + ")V"));
-        assertTrue(methods.contains("handleLevelEvent(" + Type.getDescriptor(load(packets + "ClientboundLevelEventPacket")) + ")V"));
-        assertTrue(methods.contains("handleExplosion(" + Type.getDescriptor(load(packets + "ClientboundExplodePacket")) + ")V"));
+        assertTrue(methods.contains("handleActions()V"));
+        assertTrue(methods.contains("handleNextTick()V"));
     }
 }
