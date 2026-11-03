@@ -44,6 +44,20 @@ public final class CutTracks {
                 || CutKeys.isCut(((TimelapseKeyframe) t.keyframesByTick.firstEntry().getValue()).ticks));
     }
 
+    public static boolean isMuted(EditorState state, int tick) {
+        if (state == null) return false;
+        long stamp = state.acquireRead();
+        try {
+            for (KeyframeTrack track : state.getCurrentScene(stamp).keyframeTracks) {
+                if (track.enabled && isCut(track)
+                        && track.keyframesByTick.firstKey() <= tick && tick < track.keyframesByTick.lastKey()) return true;
+            }
+            return false;
+        } finally {
+            state.release(stamp);
+        }
+    }
+
     public static int removeAll(EditorState state) {
         return editCuts(state, null, 0);
     }

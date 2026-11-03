@@ -15,6 +15,34 @@ import org.joml.Vector3d;
 import org.junit.jupiter.api.Test;
 
 class EditorActionsTest {
+    @Test
+    void cutSoundMuteUsesEnabledCutRangesOnly() {
+        assertFalse(CutTracks.isMuted(null, 150));
+        EditorState s = new EditorState();
+        CutTracks.add(s, 100, 200, 0);
+        assertFalse(CutTracks.isMuted(s, 99));
+        assertTrue(CutTracks.isMuted(s, 100));
+        assertTrue(CutTracks.isMuted(s, 199));
+        assertFalse(CutTracks.isMuted(s, 200));
+
+        CutTracks.add(s, 300, 305, 5);
+        assertTrue(CutTracks.isMuted(s, 150));
+        assertTrue(CutTracks.isMuted(s, 300));
+        assertTrue(CutTracks.isMuted(s, 304));
+        assertFalse(CutTracks.isMuted(s, 305));
+
+        CutTracks.addTimelapse(s, 400, 500, 5);
+        long st = s.acquireWrite();
+        EditorScene sc = s.getCurrentScene(st);
+        sc.keyframeTracks.add(camera(600, 700, false, true));
+        sc.keyframeTracks.get(1).enabled = false;
+        s.release(st);
+        assertFalse(CutTracks.isMuted(s, 150));
+        assertFalse(CutTracks.isMuted(s, 450));
+        assertFalse(CutTracks.isMuted(s, 650));
+        assertTrue(CutTracks.isMuted(s, 302));
+    }
+
     private static KeyframeTrack camera(int a, int b, boolean orbit, boolean enabled) {
         KeyframeTrack t = new KeyframeTrack(orbit ? CameraOrbitKeyframeType.INSTANCE : CameraKeyframeType.INSTANCE);
         t.enabled = enabled;

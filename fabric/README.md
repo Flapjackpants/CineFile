@@ -47,6 +47,8 @@ The camera path is checked in the real world at that moment in the replay.
 
 Cut length 0 removes all frames between the two keyframes. Cut length 1 or more plays a normal timelapse of that length.
 
+Sounds inside a cut are dropped in preview and export. Sounds from block and entity events inside a cut, such as note blocks, can still play.
+
 Short timelapses leave stray frames from the middle of the skipped range. Measured on Flashback 0.43.6's export code for a 1-tick timelapse: 1 frame at 24 or 30 fps, 2-3 at 60, and 5-6 at 120.
 
 Cuts are saved as timelapse tracks, so the replay still opens without this mod. A length-0 cut then plays as a 1-tick timelapse. Export still simulates the ticks inside a cut, so very long cuts export more slowly.

@@ -9,4 +9,7 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 public interface ReplayServerAccessor {
     @Accessor("playbackFileSystem")
     FileSystem cinefile$fileSystem();
+
+    @Accessor("currentTick")
+    int cinefile$currentTick();
 }
