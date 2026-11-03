@@ -1,5 +1,9 @@
 package com.cinefile.core;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+
 public final class CutKeys {
     public static final int CUT_BASE = 1_000_000;
     public static final float CUT_TICKRATE = 1e9f;
@@ -16,6 +20,21 @@ public final class CutKeys {
 
     public static boolean isCutSpeed(float speed) {
         return speed >= CUT_TICKRATE / 20f;
+    }
+
+    public static List<int[]> gaps(List<int[]> ranges, int minGap) {
+        List<int[]> sorted = new ArrayList<>();
+        for (int[] range : ranges) sorted.add(range.clone());
+        sorted.sort(Comparator.comparingInt(r -> r[0]));
+        List<int[]> gaps = new ArrayList<>();
+        if (sorted.isEmpty()) return gaps;
+        int end = sorted.get(0)[1];
+        for (int i = 1; i < sorted.size(); i++) {
+            int[] range = sorted.get(i);
+            if (range[0] > end && range[0] - end >= minGap) gaps.add(new int[] {end, range[0]});
+            end = Math.max(end, range[1]);
+        }
+        return gaps;
     }
 
     public static int[] rangeFromPlayhead(int playhead, int totalTicks) {
