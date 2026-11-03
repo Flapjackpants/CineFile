@@ -69,11 +69,14 @@ Open settings through Mod Menu.
 | Clip length | Target length of each clip. |
 | Total duration | Target length of the whole scene. |
 | Style | Shot style. `auto` by default. |
-| Tries per clip | How many candidates to try per clip. 5 by default. |
+| Focus level | `Auto` tries player center, eye level, high angle, and low angle, then keeps the best shot that passes checks. You can also fix one of those levels or choose the style preset. |
+| Tries per clip | How many candidates to try per clip. 5 by default; Auto also tries each candidate at every focus level. |
 | Fill gaps with | What goes between placed clips: a cut, a 1-second timelapse, or nothing. |
 | Cut length | Length in ticks of newly made cuts. See above. |
 
 Leaving the key blank uses heuristics only.
+
+Camera distance, side offset, and orbit adjust to the replay's FOV, using 53 degrees as the reference. The replay uses Flashback's FOV override when enabled, or the game's FOV otherwise.
 
 ## Privacy
 

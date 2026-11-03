@@ -86,9 +86,10 @@ public final class AutoCreateJob {
         switch (state) {
             case START -> {
                 occupied = d.occupiedRanges();
+                double fov = d.fovDegrees();
                 d.status("Planning clips...");
                 List<int[]> occ = new ArrayList<>(occupied);
-                planF = CompletableFuture.supplyAsync(() -> plan(occ));
+                planF = CompletableFuture.supplyAsync(() -> plan(occ, fov));
                 state = State.PLANNING;
             }
             case PLANNING -> {
@@ -153,7 +154,7 @@ public final class AutoCreateJob {
         return cur.variants().get(variant).clip();
     }
 
-    private List<Window> plan(List<int[]> occ) {
+    private List<Window> plan(List<int[]> occ, double fov) {
         List<Candidate> cs = Candidates.windows(t, clipTicks, 500, cfg.rejectCuts, cfg.rejectDimensionChanges);
         List<Style> styles = Styles.resolve(cfg.styleId);
         int perStyle = Styles.triesPerStyle(cfg.tries, styles.size());
@@ -163,11 +164,14 @@ public final class AutoCreateJob {
             List<Variant> vs = new ArrayList<>();
             for (Style s : styles) {
                 for (int i = 0; i < perStyle; i++) {
-                    CameraClip k = CameraSynth.synthesize(t, c.start(), c.end(), Styles.variant(s, i, c.start()), 0);
-                    if (k == null) continue;
-                    FramingStats fs = Framing.stats(t, k, 20);
-                    if (cfg.rejectOffscreenPlayer && fs.onscreenFrac() < 0.5) continue;
-                    vs.add(new Variant(k, Framing.multiplier(fs)));
+                    for (FocusLevel level : cfg.focusLevel.candidates()) {
+                        CameraClip k = CameraSynth.synthesize(t, c.start(), c.end(), Styles.variant(s, i, c.start()), 0, level, fov);
+                        if (k == null) continue;
+                        FramingStats fs = Framing.stats(t, k, 20, fov);
+                        if (cfg.rejectOffscreenPlayer && fs.onscreenFrac() < 0.5) continue;
+                        double mult = Framing.multiplier(fs) * (0.3 + 0.7 * Framing.sizeScore(t, k, 20, fov)) * level.weight();
+                        vs.add(new Variant(k, mult));
+                    }
                 }
             }
             if (vs.isEmpty()) continue;

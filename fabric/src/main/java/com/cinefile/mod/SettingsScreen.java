@@ -2,6 +2,7 @@ package com.cinefile.mod;
 
 import com.cinefile.core.CineFileConfig;
 import com.cinefile.core.CineFileConfig.GapFill;
+import com.cinefile.core.FocusLevel;
 import java.io.IOException;
 import java.util.List;
 import java.util.function.Consumer;
@@ -74,6 +75,16 @@ public class SettingsScreen extends Screen {
         l.number("Total duration (s)", () -> c.durationS, v -> c.durationS = v);
         l.add("Style", CycleButton.builder((String s) -> Component.literal(s), c.styleId).withValues(STYLES)
             .displayOnlyValue().create(0, 0, WIDGET_WIDTH, 20, Component.literal("Style"), (b, v) -> c.styleId = v));
+        AbstractWidget focus = l.add("Focus level", CycleButton.builder((FocusLevel level) -> Component.literal(switch (level) {
+            case AUTO -> "Auto";
+            case CENTER -> "Player center";
+            case EYE -> "Eye level";
+            case HIGH -> "High angle";
+            case LOW -> "Low angle";
+            case STYLE -> "Style preset";
+        }), c.focusLevel).withValues(FocusLevel.values()).displayOnlyValue()
+            .create(0, 0, WIDGET_WIDTH, 20, Component.literal("Focus level"), (b, v) -> c.focusLevel = v));
+        focus.setTooltip(Tooltip.create(Component.literal("Height the camera sits and aims at. Auto tries each level and keeps the best shot that passes the checks. Distances adjust to your FOV automatically")));
         l.number("Tries per clip", () -> c.tries, v -> c.tries = (int) Math.round(v));
 
         l.header("Clip checks");

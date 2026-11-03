@@ -21,6 +21,7 @@ public final class CineFileConfig {
     public boolean rejectOffscreenPlayer = true;
     public int tries = 5, checkEveryTicks = 10, cutLengthTicks = 0;
     public GapFill gapFill = GapFill.CUT;
+    public FocusLevel focusLevel = FocusLevel.AUTO;
 
     private static final Logger LOGGER = LoggerFactory.getLogger("cinefile");
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -68,6 +69,7 @@ public final class CineFileConfig {
         if (project == null) project = d.project;
         if (styleId == null || !STYLES.contains(styleId)) styleId = d.styleId;
         if (gapFill == null) gapFill = d.gapFill;
+        if (focusLevel == null) focusLevel = d.focusLevel;
         maxAiUsd = Math.clamp(maxAiUsd, 0, 100);
         clipLengthS = Math.clamp(clipLengthS, 1, 600);
         durationS = Math.clamp(durationS, 1, 36000);

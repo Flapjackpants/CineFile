@@ -10,6 +10,7 @@ import java.util.function.Predicate;
 /** atTick is true on the call after seek; everything is recorded. */
 final class FakeDriver implements ReplayDriver {
     int cur = -1;
+    double fov = 70;
     boolean neverAtTick;
     BiPredicate<double[], double[]> blocked = (a, b) -> false;
     Predicate<double[]> loaded = p -> true;
@@ -31,6 +32,7 @@ final class FakeDriver implements ReplayDriver {
 
     public boolean atTick(int tick) { return !neverAtTick && cur == tick; }
     public String dimension() { return dim.apply(cur); }
+    public double fovDegrees() { return fov; }
     public boolean isLoaded(double[] pos) { return loaded.test(pos); }
     public boolean blocked(double[] from, double[] to) { return blocked.test(from, to); }
 

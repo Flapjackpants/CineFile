@@ -38,6 +38,73 @@ class AutoCreateJobTest {
         return Replays.trajectory(t -> new Pose(0.4 * t, 64, 3 * Math.sin(t / 10.0), (t * 7) % 90, 5), n);
     }
 
+    static Trajectory walk() throws Exception {
+        return Replays.trajectory(t -> new Pose(0.4 * t, 64, 0, 0, 0), 500);
+    }
+
+    static CineFileConfig walkConfig(FocusLevel level) {
+        CineFileConfig c = cfg(10);
+        c.focusLevel = level;
+        return c;
+    }
+
+    @Test
+    void fixedFocusLevelsSetCameraHeightAndPitch() throws Exception {
+        for (FocusLevel level : List.of(FocusLevel.CENTER, FocusLevel.EYE)) {
+            FakeDriver d = new FakeDriver();
+            run(d, walk(), walkConfig(level), null);
+            assertFalse(d.committed.isEmpty(), level.toString());
+            double y = level == FocusLevel.CENTER ? 64.9 : 65.62;
+            for (CameraClip k : d.committed) {
+                assertEquals(y, k.a().y(), 1e-6);
+                assertEquals(y, k.b().y(), 1e-6);
+                assertEquals(0, k.a().pitch(), 0.01);
+                assertEquals(0, k.b().pitch(), 0.01);
+            }
+        }
+    }
+
+    @Test
+    void autoFocusTriesHigherLevelWhenCenterIsBlocked() throws Exception {
+        FakeDriver d = new FakeDriver();
+        run(d, walk(), walkConfig(FocusLevel.AUTO), null);
+        assertFalse(d.shown.isEmpty());
+        assertEquals(64.9, d.shown.get(0).a().y(), 1e-6);
+
+        FakeDriver blocked = new FakeDriver();
+        blocked.blocked = (from, to) -> from[1] < 65;
+        run(blocked, walk(), walkConfig(FocusLevel.AUTO), null);
+        assertFalse(blocked.committed.isEmpty());
+        assertTrue(blocked.committed.get(0).a().y() >= 65);
+    }
+
+    @Test
+    void jobTunesDistanceToReplayFov() throws Exception {
+        CineFileConfig c = walkConfig(FocusLevel.CENTER);
+        c.styleId = "locked-dolly";
+        FakeDriver narrow = new FakeDriver();
+        narrow.fov = 53;
+        run(narrow, walk(), c, null);
+        FakeDriver wide = new FakeDriver();
+        wide.fov = 90;
+        run(wide, walk(), c, null);
+        assertFalse(narrow.committed.isEmpty());
+        assertFalse(wide.committed.isEmpty());
+        CameraKey a = narrow.committed.get(0).a(), b = wide.committed.get(0).a();
+        double near = Math.hypot(a.x() - 0.4 * a.tick(), a.z());
+        double far = Math.hypot(b.x() - 0.4 * b.tick(), b.z());
+        assertTrue(far < near, far + " < " + near);
+    }
+
+    @Test
+    void autoStyleBalancesSubjectSizeAgainstDistance() throws Exception {
+        FakeDriver d = new FakeDriver();
+        d.fov = 53;
+        run(d, walk(), walkConfig(FocusLevel.CENTER), null);
+        assertFalse(d.shown.isEmpty());
+        assertNotEquals("high-crane", d.shown.get(0).styleId());
+    }
+
     static CineFileConfig cfg(double durationS) {
         CineFileConfig c = new CineFileConfig();
         c.durationS = durationS;
