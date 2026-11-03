@@ -2,7 +2,6 @@ package com.cinefile.core;
 
 /** Screen-space framing evaluation of synthesized clips (port of cinefile/framing.py, without the world branch). */
 public final class Framing {
-    private static final double FOV_Y_DEG = 70.0;
     private static final double ASPECT = 16.0 / 9.0;
     private static final double SUBJECT_HEIGHT = 1.0;
     private static final double CENTER_SIGMA = 0.15;
@@ -14,6 +13,10 @@ public final class Framing {
 
     /** {u, v} of a world point for camera {x, y, z, yaw, pitch}; null if behind the camera. */
     public static double[] projectToScreen(double[] cam, double[] p) {
+        return projectToScreen(cam, p, 70.0);
+    }
+
+    public static double[] projectToScreen(double[] cam, double[] p, double fovDeg) {
         double sy = Math.sin(Math.toRadians(cam[3])), cyw = Math.cos(Math.toRadians(cam[3]));
         double sp = Math.sin(Math.toRadians(cam[4])), cp = Math.cos(Math.toRadians(cam[4]));
         double[] f = {-sy * cp, -sp, cyw * cp};
@@ -23,7 +26,7 @@ public final class Framing {
         double depth = dot(rel, f);
         if (depth <= 0.05) return null;
         double xc = dot(rel, r), yc = dot(rel, up);
-        double th = Math.tan(Math.toRadians(FOV_Y_DEG) / 2);
+        double th = Math.tan(Math.toRadians(fovDeg) / 2);
         return new double[] {0.5 + 0.5 * xc / (depth * th * ASPECT), 0.5 - 0.5 * yc / (depth * th)};
     }
 
@@ -44,6 +47,10 @@ public final class Framing {
     }
 
     public static FramingStats stats(Trajectory t, CameraClip c, int samples) {
+        return stats(t, c, samples, 70.0);
+    }
+
+    public static FramingStats stats(Trajectory t, CameraClip c, int samples, double fovDeg) {
         int span = c.endTick() - c.startTick();
         int n = 0, on = 0, cen = 0, thi = 0;
         double total = 0;
@@ -52,7 +59,7 @@ public final class Framing {
             Pose p = t.sample(tick);
             if (p == null) continue;
             n++;
-            double[] uv = projectToScreen(cameraAt(c, tick), new double[] {p.x(), p.y() + SUBJECT_HEIGHT, p.z()});
+            double[] uv = projectToScreen(cameraAt(c, tick), new double[] {p.x(), p.y() + SUBJECT_HEIGHT, p.z()}, fovDeg);
             if (uv == null || !(0 <= uv[0] && uv[0] <= 1 && 0 <= uv[1] && uv[1] <= 1)) continue;
             on++;
             double dc = Math.hypot(uv[0] - 0.5, uv[1] - 0.5);
@@ -64,6 +71,26 @@ public final class Framing {
         }
         if (n == 0) return new FramingStats(0, 0, 0, 0, 0, 0);
         return new FramingStats((double) on / n, (double) cen / n, (double) thi / n, total / n, 0, 0);
+    }
+
+    /** Mean normalized subject height over on-screen samples. */
+    public static double sizeScore(Trajectory t, CameraClip c, int samples, double fovDeg) {
+        int span = c.endTick() - c.startTick();
+        int on = 0;
+        double total = 0;
+        for (int i = 0; i < samples; i++) {
+            int tick = (int) Math.rint(c.startTick() + (double) i * span / (samples - 1));
+            Pose p = t.sample(tick);
+            if (p == null) continue;
+            double[] cam = cameraAt(c, tick);
+            double[] uv = projectToScreen(cam, new double[] {p.x(), p.y() + SUBJECT_HEIGHT, p.z()}, fovDeg);
+            if (uv == null || !(0 <= uv[0] && uv[0] <= 1 && 0 <= uv[1] && uv[1] <= 1)) continue;
+            on++;
+            double[] feet = projectToScreen(cam, new double[] {p.x(), p.y(), p.z()}, fovDeg);
+            double[] head = projectToScreen(cam, new double[] {p.x(), p.y() + 1.8, p.z()}, fovDeg);
+            if (feet != null && head != null) total += Math.min(1, Math.max(0, feet[1] - head[1]) / 0.25);
+        }
+        return on == 0 ? 0 : total / on;
     }
 
     public static double multiplier(FramingStats s) {

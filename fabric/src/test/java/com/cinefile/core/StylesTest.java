@@ -7,6 +7,30 @@ import org.junit.jupiter.api.Test;
 
 class StylesTest {
     @Test
+    void fovTuningPreservesMetadataAndScalesGeometry() {
+        assertEquals(1, Styles.fovScale(53), 1e-12);
+        assertEquals(0.712, Styles.fovScale(70), 0.002);
+        assertEquals(0.4, Styles.fovScale(120));
+        assertEquals(2.5, Styles.fovScale(5));
+        Style dolly = Styles.resolve("locked-dolly").get(0);
+        Style orbit = Styles.resolve("orbit-reveal").get(0);
+        Style at53 = Styles.tuned(orbit, 53);
+        assertEquals(orbit.id(), at53.id());
+        assertEquals(orbit.description(), at53.description());
+        assertEquals(orbit.distance(), at53.distance(), 1e-12);
+        assertEquals(orbit.height(), at53.height(), 1e-12);
+        assertEquals(orbit.lateral(), at53.lateral(), 1e-12);
+        assertEquals(orbit.pitch(), at53.pitch());
+        assertEquals(orbit.yawLock(), at53.yawLock());
+        assertEquals(orbit.dollyScale(), at53.dollyScale());
+        assertEquals(orbit.thirdsSide(), at53.thirdsSide());
+        assertEquals(26.5, at53.orbitDegrees(), 0.1);
+        assertEquals(6 * Styles.fovScale(70), Styles.tuned(dolly, 70).distance(), 1e-12);
+        assertEquals(4.27, Styles.tuned(dolly, 70).distance(), 0.02);
+        assertEquals(35, Styles.tuned(orbit, 70).orbitDegrees(), 1e-12);
+        assertEquals(0, Styles.tuned(dolly, 53).orbitDegrees());
+    }
+    @Test
     void allIsSortedWithYamlValues() {
         List<Style> all = Styles.all();
         assertEquals(List.of("hero-low", "high-crane", "locked-dolly", "orbit-reveal", "side-track"), all.stream().map(Style::id).toList());
