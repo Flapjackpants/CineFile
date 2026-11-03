@@ -39,7 +39,8 @@ The camera path is checked in the real world at that moment in the replay.
 
 ## Other tools
 
-- **Cut** adds a cut from the playhead to 5 seconds later. Drag its keyframes to change the range. Hovering **Cut** shows **Remove all cuts** and **Reset cuts**. Reset removes all cuts and adds one in each gap of 5+ ticks between camera tracks, using the current cut length. Each action is one undo step. Undo restores cuts but not their names, matching Delete All's limit.
+- **Cut** opens a menu with **Remove all cuts** and **Reset cuts**. Each asks first. Reset removes all cuts and adds one in each gap of 5+ ticks between camera tracks, using the current cut length. Each action is one undo step. Undo restores cuts but not their names, matching Delete All's limit.
+- To add a cut, click **Add Element** in the timeline, then **Cut**. It runs from the playhead to 5 seconds later. Drag its keyframes to change the range.
 - **Delete All** asks first, then removes every track from the current scene and clears the export range. Undo restores the tracks, but not the range or custom track names.
 - Scrolling: the wheel scrolls tracks, Ctrl+wheel zooms, and Shift+wheel pans.
 

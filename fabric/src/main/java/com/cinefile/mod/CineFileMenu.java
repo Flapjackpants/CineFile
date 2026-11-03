@@ -9,7 +9,6 @@ import com.moulberry.flashback.state.EditorScene;
 import com.moulberry.flashback.state.EditorState;
 import com.moulberry.flashback.state.EditorStateManager;
 import imgui.moulberry90.ImGui;
-import imgui.moulberry90.flag.ImGuiPopupFlags;
 import imgui.moulberry90.flag.ImGuiWindowFlags;
 import imgui.moulberry90.type.ImDouble;
 import java.util.Locale;
@@ -17,12 +16,27 @@ import java.util.Locale;
 public final class CineFileMenu {
     private static boolean openDialog;
     private static boolean openAutoDialog;
+    private static boolean openRemoveCuts;
+    private static boolean openResetCuts;
+    private static boolean cutRequested;
     private static CostEstimate costEstimate;
     private static final ImDouble budget = new ImDouble();
 
     private CineFileMenu() {}
 
+    public static boolean cutEnabled() {
+        return !AutoCreateController.isRunning() && !Flashback.isExporting();
+    }
+
+    public static void requestCut() {
+        cutRequested = true;
+    }
+
     public static void render() {
+        if (cutRequested) {
+            cutRequested = false;
+            if (cutEnabled()) CutTracks.addAtPlayhead();
+        }
         TimelineScroll.rebindOnce();
         EditorState state = EditorStateManager.getCurrent();
         int tracks = 0;
@@ -53,36 +67,20 @@ public final class CineFileMenu {
             budget.set(cfg.maxAiUsd);
             openAutoDialog = true;
         }
-        boolean cutEnabled = !running && !Flashback.isExporting();
-        if (ImGui.menuItem("Cut##CineFile", "", false, cutEnabled)) {
-            CutTracks.addAtPlayhead();
-        }
-        float x0 = ImGui.getItemRectMinX(), y0 = ImGui.getItemRectMinY();
-        float x1 = ImGui.getItemRectMaxX(), y1 = ImGui.getItemRectMaxY();
-        boolean overCut = ImGui.isMouseHoveringRect(x0, y0, x1, y1, false);
-        boolean open = ImGui.isPopupOpen("###CineFileCutMenu");
-        if (cutEnabled && overCut && !open && !ImGui.isAnyMouseDown() && ImGui.isWindowHovered()
-                && !ImGui.isPopupOpen("", ImGuiPopupFlags.AnyPopup)) {
-            ImGui.openPopup("###CineFileCutMenu");
-        }
-        if (cutEnabled && open && overCut && ImGui.isMouseClicked(0)) CutTracks.addAtPlayhead();
+        if (ImGui.menuItem("Cut##CineFile", "", false, cutEnabled())) ImGui.openPopup("###CineFileCutMenu");
+        float x0 = ImGui.getItemRectMinX(), y1 = ImGui.getItemRectMaxY();
         ImGui.setNextWindowPos(x0, y1);
         if (ImGui.beginPopup("###CineFileCutMenu", ImGuiWindowFlags.NoMove
                 | ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.AlwaysAutoResize)) {
             if (ImGui.menuItem("Remove all cuts", "", false, cuts > 0)) {
-                int removed = CutTracks.removeAll(state);
-                ReplayUI.setInfoOverlayShort("Removed " + removed + " cuts");
+                openRemoveCuts = true;
                 ImGui.closeCurrentPopup();
             }
             if (ImGui.menuItem("Reset cuts", "", false, cuts > 0 || tracks > 0)) {
-                int added = CutTracks.reset(state, CineFileClient.config().cutLengthTicks);
-                ReplayUI.setInfoOverlayShort("Reset: " + added + " cuts");
+                openResetCuts = true;
                 ImGui.closeCurrentPopup();
             }
-            boolean overPopup = ImGui.isMouseHoveringRect(ImGui.getWindowPosX(), ImGui.getWindowPosY(),
-                    ImGui.getWindowPosX() + ImGui.getWindowSizeX(), ImGui.getWindowPosY() + ImGui.getWindowSizeY(), false);
-            boolean overBridge = ImGui.isMouseHoveringRect(x0, y1 - 1, x1, y1 + 4, false);
-            if (!cutEnabled || (!overCut && !overPopup && !overBridge)) ImGui.closeCurrentPopup();
+            if (!cutEnabled()) ImGui.closeCurrentPopup();
             ImGui.endPopup();
         }
         if (ImGui.menuItem("Delete All##CineFile", "", false, !running && (tracks > 0 || hasRange))) {
@@ -134,6 +132,44 @@ public final class CineFileMenu {
             if (ImGui.button("Cancel")) {
                 ImGui.closeCurrentPopup();
             }
+            ImGuiHelper.endPopupModalCloseable();
+        }
+
+        if (openRemoveCuts) {
+            ImGui.openPopup("###CineFileRemoveCuts");
+            openRemoveCuts = false;
+        }
+        if (ImGuiHelper.beginPopupModalCloseable("Remove All Cuts###CineFileRemoveCuts", ImGuiWindowFlags.AlwaysAutoResize)) {
+            ImGui.text("Remove all " + cuts + " cuts from \"" + sceneName + "\"?");
+            ImGui.text("Undo restores the cuts, but not their names.");
+            if (ImGui.button("Remove All")) {
+                if (state != null) {
+                    int removed = CutTracks.removeAll(state);
+                    ReplayUI.setInfoOverlayShort("Removed " + removed + " cuts");
+                }
+                ImGui.closeCurrentPopup();
+            }
+            ImGui.sameLine();
+            if (ImGui.button("Cancel")) ImGui.closeCurrentPopup();
+            ImGuiHelper.endPopupModalCloseable();
+        }
+
+        if (openResetCuts) {
+            ImGui.openPopup("###CineFileResetCuts");
+            openResetCuts = false;
+        }
+        if (ImGuiHelper.beginPopupModalCloseable("Reset Cuts###CineFileResetCuts", ImGuiWindowFlags.AlwaysAutoResize)) {
+            ImGui.text("Remove all " + cuts + " cuts and add one in each gap of 5+ ticks between camera tracks?");
+            ImGui.text("Undo restores the cuts, but not their names.");
+            if (ImGui.button("Reset")) {
+                if (state != null) {
+                    int added = CutTracks.reset(state, CineFileClient.config().cutLengthTicks);
+                    ReplayUI.setInfoOverlayShort("Reset: " + added + " cuts");
+                }
+                ImGui.closeCurrentPopup();
+            }
+            ImGui.sameLine();
+            if (ImGui.button("Cancel")) ImGui.closeCurrentPopup();
             ImGuiHelper.endPopupModalCloseable();
         }
     }

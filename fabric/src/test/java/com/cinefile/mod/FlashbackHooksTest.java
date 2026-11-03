@@ -71,4 +71,31 @@ class FlashbackHooksTest {
         assertTrue(methods.contains("handleActions()V"));
         assertTrue(methods.contains("handleNextTick()V"));
     }
+
+    @Test
+    void addElementCutTargetExists() throws Exception {
+        Class<?> timeline = load("com.moulberry.flashback.editor.ui.windows.TimelineWindow");
+        boolean[] found = new boolean[2];
+        try (InputStream in = timeline.getResourceAsStream("TimelineWindow.class")) {
+            assertNotNull(in);
+            new ClassReader(in).accept(new ClassVisitor(Opcodes.ASM9) {
+                @Override
+                public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
+                    if (!name.equals("renderKeyframeElements") || !descriptor.equals("(FFII)V")) return null;
+                    found[0] = true;
+                    return new MethodVisitor(Opcodes.ASM9) {
+                        private boolean types;
+
+                        @Override
+                        public void visitMethodInsn(int opcode, String owner, String method, String descriptor, boolean isInterface) {
+                            if (owner.equals("com/moulberry/flashback/keyframe/KeyframeRegistry") && method.equals("getTypes")) types = true;
+                            if (types && owner.equals("imgui/moulberry90/ImGui") && method.equals("endPopup")) found[1] = true;
+                        }
+                    };
+                }
+            }, 0);
+        }
+        assertTrue(found[0], "renderKeyframeElements(FFII)V");
+        assertTrue(found[1], "KeyframeRegistry.getTypes then ImGui.endPopup");
+    }
 }
