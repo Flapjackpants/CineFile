@@ -13,10 +13,11 @@ from cinefile.framing import (
     framing_stats,
     project_to_screen,
 )
-from cinefile.replay import Pose
+from cinefile.replay import Pose, Trajectory
 from cinefile.styles_loader import (
     Style,
     list_styles,
+    load_style,
     resolve_styles,
     style_variant,
     tries_per_style,
@@ -105,7 +106,26 @@ def test_best_clip_prefers_framed_style():
 
 def test_resolve_auto():
     assert [s.id for s in resolve_styles("auto")] == list_styles()
-    assert len(resolve_styles("auto")) == 5
+    assert len(resolve_styles("auto")) == 7
+
+
+def test_best_clip_scores_both_straight_dolly_directions():
+    traj = Trajectory(
+        meta=None,
+        poses={t: Pose(0.5 * t, 64, 0, 30 + t, 5) for t in range(31)},
+    )
+    seen = []
+    best = best_clip(
+        traj,
+        0,
+        30,
+        [load_style("straight-dolly")],
+        on_try=lambda clip, stats: seen.append((clip, framing_multiplier(stats))),
+    )
+    assert len(seen) == 2
+    assert seen[0][1] != seen[1][1]
+    assert best[0] == max(seen, key=lambda item: item[1])[0]
+    assert framing_multiplier(best[1]) == max(multiplier for _, multiplier in seen)
 
 
 def _world(solid=False, blocked=False):

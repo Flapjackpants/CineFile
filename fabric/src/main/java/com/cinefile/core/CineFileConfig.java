@@ -28,7 +28,8 @@ public final class CineFileConfig {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("cinefile");
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final Set<String> STYLES = Set.of("auto", "locked-dolly", "hero-low", "high-crane", "side-track", "orbit-reveal");
+    private static final Set<String> STYLES = Set.of("auto", "locked-dolly", "hero-low", "high-crane", "side-track", "orbit-reveal",
+        "straight-dolly", "top-down");
 
     public static CineFileConfig load(Path path) {
         CineFileConfig c = null;

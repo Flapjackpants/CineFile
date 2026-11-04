@@ -21,8 +21,9 @@ public final class AutoCreateJob {
 
     private record Window(int start, int end, double score, List<Variant> variants) {}
 
-    static final int SLICE_TRIES = 6, FILL_MAX = 20;
+    static final int SLICE_TRIES = 6, FILL_MAX = 20, MAX_SHORTENS = 3;
     private static final int MIN_REVIEW_SCORE = 4;
+    private static final double MIN_TRAVEL = 1.0;
 
     private final ReplayDriver d;
     private final Trajectory t;
@@ -51,6 +52,8 @@ public final class AutoCreateJob {
     private int variant, revI, revPhase, settle, attempt;
     private Object handle;
     private ClipVerifier verifier;
+    private CameraClip shortened;
+    private int shortens;
     private List<byte[]> frames;
     private volatile byte[] png;
     private volatile boolean pngDone;
@@ -133,6 +136,8 @@ public final class AutoCreateJob {
                     return;
                 }
                 variant = 0;
+                shortened = null;
+                shortens = 0;
                 startAttempt();
             }
             case VERIFY -> {
@@ -158,7 +163,7 @@ public final class AutoCreateJob {
     }
 
     private CameraClip clip() {
-        return cur.variants().get(variant).clip();
+        return shortened != null ? shortened : cur.variants().get(variant).clip();
     }
 
     private List<Window> plan(List<int[]> occ, double fov) {
@@ -176,15 +181,17 @@ public final class AutoCreateJob {
             for (Candidate c : Candidates.windows(subject, clipTicks, 500, cfg.rejectCuts, cfg.rejectDimensionChanges)) {
                 if (occ.stream().anyMatch(o -> overlaps(c.start(), c.end(), o[0], o[1]))) continue;
                 List<Variant> vs = new ArrayList<>();
+                Set<CameraClip> seen = new HashSet<>();
                 for (Style s : styles) {
                     for (int i = 0; i < perStyle; i++) {
                         for (FocusLevel level : cfg.focusLevel.candidates()) {
-                            CameraClip k = CameraSynth.synthesize(subject, c.start(), c.end(), Styles.variant(s, i, c.start()), 0, level, fov);
-                            if (k == null) continue;
-                            FramingStats fs = Framing.stats(subject, k, 20, fov);
-                            if (cfg.rejectOffscreenPlayer && fs.onscreenFrac() < 0.5) continue;
-                            double mult = Framing.multiplier(fs) * (0.3 + 0.7 * Framing.sizeScore(subject, k, 20, fov)) * level.weight();
-                            vs.add(new Variant(subject, k, mult));
+                            for (CameraClip k : CameraSynth.synthesizeAll(subject, c.start(), c.end(), Styles.variant(s, i, c.start()), 0, level, fov)) {
+                                if (!seen.add(k)) continue;
+                                FramingStats fs = Framing.stats(subject, k, 20, fov);
+                                if (cfg.rejectOffscreenPlayer && fs.onscreenFrac() < 0.5) continue;
+                                double mult = Framing.multiplier(fs) * (0.3 + 0.7 * Framing.sizeScore(subject, k, 20, fov)) * level.weight();
+                                vs.add(new Variant(subject, k, mult));
+                            }
                         }
                     }
                 }
@@ -259,10 +266,30 @@ public final class AutoCreateJob {
     private void reject(Verdict v) {
         d.discardCandidate(handle);
         handle = null;
+        CameraClip next = v == Verdict.BLOCK_CLIP ? shortenedClip() : null;
+        if (next != null) {
+            shortened = next;
+            shortens++;
+            d.status("Shortening camera move");
+            startAttempt();
+            return;
+        }
+        shortened = null;
+        shortens = 0;
         rejected.merge(v, 1, Integer::sum);
         d.status("Rejected: " + v);
         if (++variant < cur.variants().size()) startAttempt();
         else state = State.PICK;
+    }
+
+    /** Shorter copy of the current straight-dolly move, ending at the last safe sample; null if it can't shorten. */
+    private CameraClip shortenedClip() {
+        CameraClip k = clip();
+        if (shortens >= MAX_SHORTENS || !Styles.STRAIGHT_DOLLY.equals(k.styleId())) return null;
+        double[] safe = verifier.lastSafe();
+        if (safe == null) return null;
+        if (Math.hypot(safe[0] - k.a().x(), safe[2] - k.a().z()) < MIN_TRAVEL) return null;
+        return k.withEnd(safe[0], safe[1], safe[2]);
     }
 
     private void commit(CameraClip k) {

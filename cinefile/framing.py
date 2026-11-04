@@ -6,7 +6,7 @@ import math
 from dataclasses import dataclass
 from typing import Any, Callable, Optional, Sequence, Tuple
 
-from .camera import CameraClip, synthesize_clip
+from .camera import CameraClip, synthesize_clips
 from .styles_loader import Style, style_variant
 
 FOV_Y_DEG = 70.0
@@ -164,12 +164,10 @@ def best_clip(
     best: Optional[Tuple[CameraClip, FramingStats]] = None
     for style in styles:
         for i in range(tries_per_style):
-            clip = synthesize_clip(traj, t0, t1, style_variant(style, i, t0))
-            if clip is None:
-                continue
-            stats = framing_stats(traj, clip, world=world)
-            if on_try is not None:
-                on_try(clip, stats)
-            if best is None or framing_multiplier(stats) > framing_multiplier(best[1]):
-                best = (clip, stats)
+            for clip in synthesize_clips(traj, t0, t1, style_variant(style, i, t0)):
+                stats = framing_stats(traj, clip, world=world)
+                if on_try is not None:
+                    on_try(clip, stats)
+                if best is None or framing_multiplier(stats) > framing_multiplier(best[1]):
+                    best = (clip, stats)
     return best

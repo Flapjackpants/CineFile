@@ -12,6 +12,18 @@ from .styles_loader import Style
 
 SPREAD_FLOOR_RATIO = 0.25  # slices whose best window is below this × median score count as idle
 
+# Style IDs with two directions per window.
+STRAIGHT_DOLLY = "straight-dolly"
+TOP_DOWN = "top-down"
+# Shortest and longest straight-dolly travel, in blocks.
+STRAIGHT_MIN_TRAVEL = 2.0
+STRAIGHT_MAX_TRAVEL = 5.0
+# Share of the player's sideways movement a straight dolly follows.
+STRAIGHT_SIDEWAYS_SHARE = 0.1
+# How far a top-down camera drifts vertically between its two keys.
+TOP_DOWN_DRIFT = 1.5
+TOP_DOWN_PITCH = 90.0
+
 
 @dataclass
 class CameraKeyframe:
@@ -123,17 +135,18 @@ def candidate_windows(
     return out[:max_candidates]
 
 
-def synthesize_clip(
+def synthesize_clips(
     traj: Trajectory,
     t0: int,
     t1: int,
     style: Style,
     score: float = 0.0,
-) -> Optional[CameraClip]:
+) -> List[CameraClip]:
+    """Every clip a style makes for this window: forward then backward for the two directional styles."""
     p0 = traj.sample(t0)
     p1 = traj.sample(t1)
     if p0 is None or p1 is None:
-        return None
+        return []
 
     if style.thirds_side == "left":
         side = -1.0
@@ -145,6 +158,53 @@ def synthesize_clip(
 
     # Locked shot yaw from average player facing (or start)
     shot_yaw = p0.yaw if style.yaw_lock else None
+
+    if style.id == STRAIGHT_DOLLY:
+        x0, y0, z0, yaw0, pitch0 = _offset_camera(p0, style, side, shot_yaw)
+        yaw_rad = math.radians(yaw0)
+        forward_x, forward_z = -math.sin(yaw_rad), math.cos(yaw_rad)
+        right_x, right_z = math.cos(yaw_rad), math.sin(yaw_rad)
+        dx, dz = p1.x - p0.x, p1.z - p0.z
+        along = dx * forward_x + dz * forward_z
+        sideways = dx * right_x + dz * right_z
+        travel = min(
+            STRAIGHT_MAX_TRAVEL, max(STRAIGHT_MIN_TRAVEL, abs(along) * style.dolly_scale)
+        )
+        clips = []
+        for direction in (1.0, -1.0):
+            end_x = x0 + forward_x * direction * travel + right_x * sideways * STRAIGHT_SIDEWAYS_SHARE
+            end_z = z0 + forward_z * direction * travel + right_z * sideways * STRAIGHT_SIDEWAYS_SHARE
+            clips.append(
+                CameraClip(
+                    t0,
+                    t1,
+                    (
+                        CameraKeyframe(t0, x0, y0, z0, yaw0, pitch0),
+                        CameraKeyframe(t1, end_x, y0, end_z, yaw0, pitch0),
+                    ),
+                    score=score,
+                    style_id=style.id,
+                )
+            )
+        return clips
+
+    if style.id == TOP_DOWN:
+        x = (p0.x + p1.x) / 2
+        z = (p0.z + p1.z) / 2
+        start_y = max(p0.y, p1.y) + style.height
+        return [
+            CameraClip(
+                t0,
+                t1,
+                (
+                    CameraKeyframe(t0, x, start_y, z, p0.yaw, TOP_DOWN_PITCH),
+                    CameraKeyframe(t1, x, start_y - direction * TOP_DOWN_DRIFT, z, p0.yaw, TOP_DOWN_PITCH),
+                ),
+                score=score,
+                style_id=style.id,
+            )
+            for direction in (1.0, -1.0)
+        ]
 
     x0, y0, z0, yaw0, pitch0 = _offset_camera(p0, style, side, shot_yaw)
     x1, y1, z1, yaw1, pitch1 = _offset_camera(p1, style, side, shot_yaw)
@@ -165,7 +225,18 @@ def synthesize_clip(
 
     kf0 = CameraKeyframe(t0, x0, y0, z0, yaw0, pitch0)
     kf1 = CameraKeyframe(t1, x1, y1, z1, yaw1, pitch1)
-    return CameraClip(t0, t1, (kf0, kf1), score=score, style_id=style.id)
+    return [CameraClip(t0, t1, (kf0, kf1), score=score, style_id=style.id)]
+
+
+def synthesize_clip(
+    traj: Trajectory,
+    t0: int,
+    t1: int,
+    style: Style,
+    score: float = 0.0,
+) -> Optional[CameraClip]:
+    clips = synthesize_clips(traj, t0, t1, style, score=score)
+    return clips[0] if clips else None
 
 
 def select_clips_greedy(

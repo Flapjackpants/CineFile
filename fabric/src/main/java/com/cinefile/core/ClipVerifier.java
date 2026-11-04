@@ -35,6 +35,11 @@ public final class ClipVerifier {
         return ticks.stream().anyMatch(x -> x > c.startTick() && x <= c.endTick());
     }
 
+    /** The last sample position that passed the block check, or null if none has. */
+    public double[] lastSafe() {
+        return prev;
+    }
+
     public Verdict step(ReplayDriver d) {
         if (early != null) return early;
         int tick = ticks[i];

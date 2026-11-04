@@ -33,7 +33,8 @@ class StylesTest {
     @Test
     void allIsSortedWithYamlValues() {
         List<Style> all = Styles.all();
-        assertEquals(List.of("hero-low", "high-crane", "locked-dolly", "orbit-reveal", "side-track"), all.stream().map(Style::id).toList());
+        assertEquals(List.of("hero-low", "high-crane", "locked-dolly", "orbit-reveal", "side-track", "straight-dolly", "top-down"),
+            all.stream().map(Style::id).toList());
         Style hero = all.get(0), orbit = all.get(3), side = all.get(4);
         assertEquals("Low camera looking up for scale on tall builds.", hero.description());
         assertEquals(7.5, hero.distance());
@@ -49,6 +50,14 @@ class StylesTest {
         assertEquals(new Style("locked-dolly", "Ep34-style locked-yaw over-the-shoulder dolly with rule-of-thirds framing.", 6.0, 1.0, 1.8, 0.0, true, 0.0, 1.0, "auto"), dolly);
         assertEquals(new Style("orbit-reveal", "Gentle yaw arc across the two keyframes around the subject.", 8.0, 2.0, 0.5, -8.0, false, 35.0, 0.6, "auto"), orbit);
         assertEquals(new Style("side-track", "Strong lateral thirds framing, parallel tracking.", 5.5, 1.2, 3.5, -2.0, true, 0.0, 1.0, "left"), side);
+        Style straight = all.get(5);
+        assertEquals(new Style("straight-dolly", "Level straight-line move forward or back, with little side-to-side motion.",
+            6.0, 1.0, 1.8, 0.0, true, 0.0, 1.0, "auto"), straight);
+        Style top = all.get(6);
+        assertEquals(new Style("top-down", "Looks straight down at the player while moving slightly up or down.",
+            0.0, 10.0, 0.0, 90.0, true, 0.0, 1.0, "auto"), top);
+        assertEquals("straight-dolly", Styles.STRAIGHT_DOLLY);
+        assertEquals("top-down", Styles.TOP_DOWN);
     }
 
     @Test

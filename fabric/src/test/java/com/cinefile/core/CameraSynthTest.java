@@ -2,6 +2,7 @@ package com.cinefile.core;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class CameraSynthTest {
@@ -127,5 +128,135 @@ class CameraSynthTest {
         assertEquals(9, d.score());
         assertEquals(c.a(), d.a());
         assertEquals(c.styleId(), d.styleId());
+    }
+
+    private static List<CameraClip> all(Trajectory t, String id, int t0, int t1, FocusLevel level, double fov) {
+        return CameraSynth.synthesizeAll(t, t0, t1, Styles.resolve(id).get(0), 0, level, fov);
+    }
+
+    @Test
+    void straightDollyTriesBothDirections() throws Exception {
+        List<CameraClip> clips = all(walk(1), "straight-dolly", 0, 30, null, 1);
+        assertEquals(2, clips.size());
+        CameraClip fwd = clips.get(0), back = clips.get(1);
+        for (CameraClip c : clips) {
+            assertEquals(0, c.startTick());
+            assertEquals(30, c.endTick());
+            assertEquals("straight-dolly", c.styleId());
+            assertArrayEquals(new double[] {4.558845726811989, 66.62, -4.296152422706632, 42.68038349181982, 0.0},
+                new double[] {c.a().x(), c.a().y(), c.a().z(), c.a().yaw(), c.a().pitch()}, 1e-9);
+            assertEquals(c.a().yaw(), c.b().yaw(), 1e-9);
+            assertEquals(c.a().pitch(), c.b().pitch(), 1e-9);
+        }
+        assertArrayEquals(new double[] {1.979967, 66.62, 0.127124},
+            new double[] {fwd.b().x(), fwd.b().y(), fwd.b().z()}, 1e-5);
+        assertArrayEquals(new double[] {8.759047, 66.62, -7.224343},
+            new double[] {back.b().x(), back.b().y(), back.b().z()}, 1e-5);
+        assertEquals(fwd, CameraSynth.synthesize(walk(1), 0, 30, Styles.resolve("straight-dolly").get(0), 0, null, 1));
+    }
+
+    @Test
+    void topDownLooksStraightDownAndDriftsBothWays() throws Exception {
+        List<CameraClip> clips = all(walk(1), "top-down", 0, 30, null, 1);
+        assertEquals(2, clips.size());
+        for (CameraClip c : clips) {
+            for (CameraKey k : new CameraKey[] {c.a(), c.b()}) {
+                assertEquals(7.5, k.x(), 1e-9);
+                assertEquals(0, k.z(), 1e-9);
+                assertEquals(30, k.yaw(), 1e-9);
+                assertEquals(90, k.pitch(), 1e-9);
+            }
+            assertEquals(74, c.a().y(), 1e-9);
+        }
+        assertEquals(72.5, clips.get(0).b().y(), 1e-9);
+        assertEquals(75.5, clips.get(1).b().y(), 1e-9);
+    }
+
+    @Test
+    void straightDollyTravelIsTwoBlocksWhenStationary() throws Exception {
+        for (CameraClip c : all(stationary(), "straight-dolly", 0, 30, null, 1)) {
+            assertEquals(2, Math.hypot(c.b().x() - c.a().x(), c.b().z() - c.a().z()), 1e-9);
+            assertEquals(c.a().y(), c.b().y(), 1e-9);
+        }
+    }
+
+    /** Camera move as {along the start view, along the start right}. */
+    private static double[] viewMove(CameraClip c) {
+        double yaw = Math.toRadians(c.a().yaw());
+        double dx = c.b().x() - c.a().x(), dz = c.b().z() - c.a().z();
+        return new double[] {-dx * Math.sin(yaw) + dz * Math.cos(yaw), dx * Math.cos(yaw) + dz * Math.sin(yaw)};
+    }
+
+    @Test
+    void straightDollyMovesAlongTheCameraViewWithNoSidewaysWhenStationary() throws Exception {
+        List<CameraClip> clips = all(stationary(), "straight-dolly", 0, 30, null, 1);
+        assertArrayEquals(new double[] {2, 0}, viewMove(clips.get(0)), 1e-9);
+        assertArrayEquals(new double[] {-2, 0}, viewMove(clips.get(1)), 1e-9);
+    }
+
+    @Test
+    void straightDollyTravelFollowsMovementAlongTheShot() throws Exception {
+        Trajectory t = Replays.trajectory(tick -> new Pose(0, 64, tick * 0.1, 0, 0), 31);
+        for (CameraClip c : all(t, "straight-dolly", 0, 30, null, 1)) {
+            double yaw = Math.toRadians(c.a().yaw());
+            assertEquals(Math.max(2, 3 * Math.cos(yaw)), Math.abs(viewMove(c)[0]), 1e-9);
+            assertEquals(0.3 * Math.sin(yaw), viewMove(c)[1], 1e-9);
+        }
+    }
+
+    @Test
+    void straightDollyFollowsTenPercentOfSidewaysMovement() throws Exception {
+        Trajectory t = Replays.trajectory(tick -> new Pose(tick * 0.1, 64, 0, 0, 0), 31);
+        for (CameraClip c : all(t, "straight-dolly", 0, 30, null, 1)) {
+            double yaw = Math.toRadians(c.a().yaw());
+            assertEquals(2, Math.abs(viewMove(c)[0]), 1e-9);
+            assertEquals(0.3 * Math.cos(yaw), viewMove(c)[1], 1e-9);
+        }
+    }
+
+    @Test
+    void straightDollyKeepsOneLevelEvenWhenThePlayerClimbs() throws Exception {
+        Trajectory t = Replays.trajectory(tick -> new Pose(0, 64 + tick / 10.0, 0, 0, 0), 31);
+        for (FocusLevel level : new FocusLevel[] {null, FocusLevel.CENTER}) {
+            List<CameraClip> clips = all(t, "straight-dolly", 0, 30, level, 53);
+            assertEquals(2, clips.size());
+            for (CameraClip c : clips) assertEquals(c.a().y(), c.b().y(), 1e-9);
+        }
+    }
+
+    @Test
+    void topDownIgnoresFocusLevelAndJitterPitch() throws Exception {
+        Style style = Styles.resolve("top-down").get(0);
+        assertEquals(CameraSynth.synthesizeAll(stationary(), 0, 30, style, 0, FocusLevel.CENTER, 53),
+            CameraSynth.synthesizeAll(stationary(), 0, 30, style, 0, FocusLevel.HIGH, 53));
+        for (CameraClip c : CameraSynth.synthesizeAll(stationary(), 0, 30, Styles.variant(style, 3, 40), 0, null, 1)) {
+            assertEquals(90, c.a().pitch(), 1e-9);
+            assertEquals(90, c.b().pitch(), 1e-9);
+        }
+    }
+
+    @Test
+    void topDownProjectsThePlayerAtScreenCenter() throws Exception {
+        CameraClip c = all(stationary(), "top-down", 0, 30, null, 1).get(0);
+        double[] uv = Framing.projectToScreen(
+            new double[] {c.a().x(), c.a().y(), c.a().z(), c.a().yaw(), c.a().pitch()}, new double[] {0, 64, 0}, 70);
+        assertNotNull(uv);
+        assertEquals(0.5, uv[0], 1e-6);
+        assertEquals(0.5, uv[1], 1e-6);
+    }
+
+    @Test
+    void synthesizeAllKeepsSingleClipStylesUnchanged() throws Exception {
+        Style locked = Styles.resolve("locked-dolly").get(0);
+        assertEquals(List.of(CameraSynth.synthesize(walk(1), 0, 30, locked, 1.5)),
+            CameraSynth.synthesizeAll(walk(1), 0, 30, locked, 1.5, null, 1));
+    }
+
+    @Test
+    void synthesizeAllHandlesMissingPosesAndAuto() throws Exception {
+        Style style = Styles.resolve("straight-dolly").get(0);
+        assertEquals(List.of(), CameraSynth.synthesizeAll(walk(1), -1, 30, style, 0, null, 1));
+        assertThrows(IllegalArgumentException.class,
+            () -> CameraSynth.synthesizeAll(walk(1), 0, 30, style, 0, FocusLevel.AUTO, 1));
     }
 }
