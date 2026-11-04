@@ -39,7 +39,7 @@ class CostEstimateTest {
         CostEstimate e = CostEstimate.of(cfg);
         assertEquals(0.0007428, e.reviewUsd(), 1e-10);
         assertEquals(0.0140928, e.typicalUsd(), 1e-10);
-        assertEquals(2.6629176, e.worstUsd(), 1e-6);
+        assertEquals(2.8530744, e.worstUsd(), 1e-6);
     }
 
     @Test
@@ -49,12 +49,20 @@ class CostEstimateTest {
         CostEstimate all = CostEstimate.of(cfg);
         cfg.focusLevel = FocusLevel.CENTER;
         CostEstimate center = CostEstimate.of(cfg);
-        assertEquals((all.worstUsd() - all.planUsd()) / 4,
+        // auto has 30 variants across four levels and 9 at one level: top-down clips don't vary by level
+        assertEquals((all.worstUsd() - all.planUsd()) * 9 / 30,
             center.worstUsd() - center.planUsd(), 1e-10);
         cfg.styleId = "locked-dolly";
         cfg.tries = 8;
         CostEstimate fixed = CostEstimate.of(cfg);
         assertEquals(fixed.planUsd() + (6 * 18 + 20) * 8 * fixed.reviewUsd(), fixed.worstUsd(), 1e-10);
+        cfg.styleId = "straight-dolly";
+        CostEstimate straight = CostEstimate.of(cfg);
+        assertEquals(straight.planUsd() + (6 * 18 + 20) * 16 * straight.reviewUsd(), straight.worstUsd(), 1e-10);
+        cfg.styleId = "top-down";
+        cfg.focusLevel = FocusLevel.AUTO;
+        CostEstimate topDown = CostEstimate.of(cfg);
+        assertEquals(topDown.planUsd() + (6 * 18 + 20) * 16 * topDown.reviewUsd(), topDown.worstUsd(), 1e-10);
     }
 
     @Test

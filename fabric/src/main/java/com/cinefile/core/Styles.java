@@ -60,6 +60,12 @@ public final class Styles {
         return lo + (hi - lo) * rng.nextDouble();
     }
 
+    /** Distinct clips one try of a style makes across this many focus levels. */
+    public static int clipsPerTry(Style s, int levels) {
+        if (TOP_DOWN.equals(s.id())) return 2; // focus levels don't change it
+        return STRAIGHT_DOLLY.equals(s.id()) ? 2 * levels : levels;
+    }
+
     public static int triesPerStyle(int tries, int nStyles) {
         return Math.max(1, (tries + nStyles / 2) / nStyles);
     }

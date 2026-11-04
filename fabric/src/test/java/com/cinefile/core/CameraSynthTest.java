@@ -148,9 +148,9 @@ class CameraSynthTest {
             assertEquals(c.a().yaw(), c.b().yaw(), 1e-9);
             assertEquals(c.a().pitch(), c.b().pitch(), 1e-9);
         }
-        assertArrayEquals(new double[] {3.183846, 66.62, 0.683494},
+        assertArrayEquals(new double[] {1.979967, 66.62, 0.127124},
             new double[] {fwd.b().x(), fwd.b().y(), fwd.b().z()}, 1e-5);
-        assertArrayEquals(new double[] {8.183846, 66.62, -7.976760},
+        assertArrayEquals(new double[] {8.759047, 66.62, -7.224343},
             new double[] {back.b().x(), back.b().y(), back.b().z()}, 1e-5);
         assertEquals(fwd, CameraSynth.synthesize(walk(1), 0, 30, Styles.resolve("straight-dolly").get(0), 0, null, 1));
     }
@@ -180,12 +180,27 @@ class CameraSynthTest {
         }
     }
 
+    /** Camera move as {along the start view, along the start right}. */
+    private static double[] viewMove(CameraClip c) {
+        double yaw = Math.toRadians(c.a().yaw());
+        double dx = c.b().x() - c.a().x(), dz = c.b().z() - c.a().z();
+        return new double[] {-dx * Math.sin(yaw) + dz * Math.cos(yaw), dx * Math.cos(yaw) + dz * Math.sin(yaw)};
+    }
+
+    @Test
+    void straightDollyMovesAlongTheCameraViewWithNoSidewaysWhenStationary() throws Exception {
+        List<CameraClip> clips = all(stationary(), "straight-dolly", 0, 30, null, 1);
+        assertArrayEquals(new double[] {2, 0}, viewMove(clips.get(0)), 1e-9);
+        assertArrayEquals(new double[] {-2, 0}, viewMove(clips.get(1)), 1e-9);
+    }
+
     @Test
     void straightDollyTravelFollowsMovementAlongTheShot() throws Exception {
         Trajectory t = Replays.trajectory(tick -> new Pose(0, 64, tick * 0.1, 0, 0), 31);
         for (CameraClip c : all(t, "straight-dolly", 0, 30, null, 1)) {
-            assertEquals(3, Math.abs(c.b().z() - c.a().z()), 1e-9);
-            assertEquals(c.a().x(), c.b().x(), 1e-9);
+            double yaw = Math.toRadians(c.a().yaw());
+            assertEquals(Math.max(2, 3 * Math.cos(yaw)), Math.abs(viewMove(c)[0]), 1e-9);
+            assertEquals(0.3 * Math.sin(yaw), viewMove(c)[1], 1e-9);
         }
     }
 
@@ -193,8 +208,9 @@ class CameraSynthTest {
     void straightDollyFollowsTenPercentOfSidewaysMovement() throws Exception {
         Trajectory t = Replays.trajectory(tick -> new Pose(tick * 0.1, 64, 0, 0, 0), 31);
         for (CameraClip c : all(t, "straight-dolly", 0, 30, null, 1)) {
-            assertEquals(0.3, c.b().x() - c.a().x(), 1e-9);
-            assertEquals(2, Math.abs(c.b().z() - c.a().z()), 1e-9);
+            double yaw = Math.toRadians(c.a().yaw());
+            assertEquals(2, Math.abs(viewMove(c)[0]), 1e-9);
+            assertEquals(0.3 * Math.cos(yaw), viewMove(c)[1], 1e-9);
         }
     }
 

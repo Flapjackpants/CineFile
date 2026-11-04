@@ -93,9 +93,9 @@ public final class CameraSynth {
                 new CameraKey(t1, x1, y1, z1, yaw1, pitch1), score, s.id()));
     }
 
-    /** Level, straight move from the same start key, either forward (dir 1) or back (dir -1). */
+    /** Level, straight move along the camera's own view from the same start key, forward (dir 1) or back (dir -1). */
     private static CameraClip straightDolly(Pose p0, Pose p1, int t0, int t1, Style s, double score, double[] k0, int dir) {
-        double yawRad = Math.toRadians(p0.yaw());
+        double yawRad = Math.toRadians(k0[3]);
         double fx = -Math.sin(yawRad), fz = Math.cos(yawRad);
         double rx = Math.cos(yawRad), rz = Math.sin(yawRad);
         double dx = p1.x() - p0.x(), dz = p1.z() - p0.z();
