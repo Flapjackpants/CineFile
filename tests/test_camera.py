@@ -1,11 +1,18 @@
+import math
+
+import pytest
+
 from cinefile.camera import (
     CameraClip,
     CameraKeyframe,
     candidate_windows,
     select_clips_spread,
     slice_candidates,
+    synthesize_clip,
+    synthesize_clips,
 )
 from cinefile.replay import Pose, Trajectory
+from cinefile.styles_loader import load_style, style_variant
 
 
 def _traj(total: int, fast_until: int) -> Trajectory:
@@ -118,3 +125,105 @@ def test_cap_smaller_than_segments():
     traj = Trajectory(meta=None, poses=poses, cuts=[200, 400, 600, 800])
     out = candidate_windows(traj, 100, max_candidates=3)
     assert 0 < len(out) <= 3
+
+
+def _walk() -> Trajectory:
+    poses = {t: Pose(0.5 * t, 64.0, 0.0, 30.0 + t, 5.0) for t in range(31)}
+    return Trajectory(meta=None, poses=poses)
+
+
+def _poses(fn) -> Trajectory:
+    return Trajectory(meta=None, poses={t: fn(t) for t in range(31)})
+
+
+def _start(clip):
+    return clip.keyframes[0]
+
+
+def _end(clip):
+    return clip.keyframes[1]
+
+
+def _view_move(clip):
+    """Camera move as (along the start view, along the start right)."""
+    yaw = math.radians(_start(clip).yaw)
+    dx = _end(clip).x - _start(clip).x
+    dz = _end(clip).z - _start(clip).z
+    return (
+        -dx * math.sin(yaw) + dz * math.cos(yaw),
+        dx * math.cos(yaw) + dz * math.sin(yaw),
+    )
+
+
+def test_straight_dolly_tries_both_directions():
+    clips = synthesize_clips(_walk(), 0, 30, load_style("straight-dolly"))
+    assert len(clips) == 2
+    for clip in clips:
+        assert (clip.start_tick, clip.end_tick, clip.style_id) == (0, 30, "straight-dolly")
+        assert (_start(clip).x, _start(clip).y, _start(clip).z) == pytest.approx(
+            (4.558845726811989, 66.62, -4.296152422706632), abs=1e-6
+        )
+        assert _start(clip).yaw == pytest.approx(42.68038349181982, abs=1e-6)
+        assert _start(clip).pitch == pytest.approx(0.0, abs=1e-6)
+        assert _end(clip).yaw == _start(clip).yaw
+        assert _end(clip).pitch == _start(clip).pitch
+
+    assert (_end(clips[0]).x, _end(clips[0]).y, _end(clips[0]).z) == pytest.approx(
+        (1.979966733340314, 66.62, 0.12712405099581892), abs=1e-6
+    )
+    assert (_end(clips[1]).x, _end(clips[1]).y, _end(clips[1]).z) == pytest.approx(
+        (8.759046887989083, 66.62, -7.2243433029987045), abs=1e-6
+    )
+
+
+def test_top_down_looks_straight_down_and_drifts_both_ways():
+    clips = synthesize_clips(_walk(), 0, 30, load_style("top-down"))
+    assert len(clips) == 2
+    for clip in clips:
+        for key in (_start(clip), _end(clip)):
+            assert (key.x, key.z, key.yaw, key.pitch) == pytest.approx((7.5, 0.0, 30.0, 90.0))
+        assert _start(clip).y == pytest.approx(74.0)
+    assert _end(clips[0]).y == pytest.approx(72.5)
+    assert _end(clips[1]).y == pytest.approx(75.5)
+
+
+def test_straight_dolly_stationary_travels_two_blocks_each_way():
+    clips = synthesize_clips(_poses(lambda t: Pose(0, 64, 0, 0, 0)), 0, 30, load_style("straight-dolly"))
+    assert len(clips) == 2
+    assert _view_move(clips[0]) == pytest.approx((2.0, 0.0), abs=1e-9)
+    assert _view_move(clips[1]) == pytest.approx((-2.0, 0.0), abs=1e-9)
+
+
+def test_straight_dolly_keeps_one_level_even_when_the_player_climbs():
+    clips = synthesize_clips(
+        _poses(lambda t: Pose(0, 64 + t / 10.0, 0, 0, 0)), 0, 30, load_style("straight-dolly")
+    )
+    assert len(clips) == 2
+    for clip in clips:
+        assert _start(clip).y == _end(clip).y
+
+
+def test_top_down_pitch_stays_90_on_a_jittered_variant():
+    style = style_variant(load_style("top-down"), 3, 40)
+    for clip in synthesize_clips(_poses(lambda t: Pose(0, 64, 0, 0, 0)), 0, 30, style):
+        assert _start(clip).pitch == 90.0
+        assert _end(clip).pitch == 90.0
+
+
+def test_locked_dolly_makes_one_clip_matching_synthesize_clip():
+    traj = _walk()
+    style = load_style("locked-dolly")
+    clips = synthesize_clips(traj, 0, 30, style, score=1.5)
+    assert clips == [synthesize_clip(traj, 0, 30, style, score=1.5)]
+
+
+def test_synthesize_clip_returns_first_direction():
+    traj = _walk()
+    style = load_style("straight-dolly")
+    assert synthesize_clip(traj, 0, 30, style) == synthesize_clips(traj, 0, 30, style)[0]
+
+
+def test_missing_pose_gives_no_clips():
+    traj = Trajectory(meta=None, poses={t: Pose(0, 64, 0, 0, 0) for t in range(1, 31)})
+    assert synthesize_clips(traj, 0, 30, load_style("straight-dolly")) == []
+    assert synthesize_clip(traj, 0, 30, load_style("straight-dolly")) is None

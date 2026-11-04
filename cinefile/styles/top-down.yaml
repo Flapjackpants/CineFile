@@ -1,0 +1,10 @@
+id: top-down
+description: Looks straight down at the player while moving slightly up or down.
+distance: 0.0
+height: 10.0
+lateral: 0.0
+pitch: 90.0
+yaw_lock: true
+orbit_degrees: 0.0
+dolly_scale: 1.0
+thirds_side: auto

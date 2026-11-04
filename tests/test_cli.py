@@ -138,6 +138,12 @@ def test_style_auto_flag():
     assert cli.build_parser().parse_args(["--style", "auto"]).style == "auto"
 
 
+def test_directional_style_flags():
+    parser = cli.build_parser()
+    for style in ("straight-dolly", "top-down"):
+        assert parser.parse_args(["--style", style]).style == style
+
+
 def test_visual_review_flag():
     assert cli.build_parser().parse_args(["--visual-review"]).visual_review is True
 

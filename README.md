@@ -119,6 +119,8 @@ cinefile --list-styles
 - `high-crane` — elevated overview
 - `side-track` — strong lateral tracking
 - `orbit-reveal` — gentle yaw arc across the shot
+- `straight-dolly` — level straight move forward or back; tries both
+- `top-down` — looks straight down, moving slightly up or down; tries both
 - `auto` — builds every style per clip and keeps the best-framed one
 
 ### AI (optional)
