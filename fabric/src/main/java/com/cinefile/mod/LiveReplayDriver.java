@@ -104,7 +104,7 @@ public final class LiveReplayDriver implements ReplayDriver {
     }
 
     private static Keyframe key(CameraKey k) {
-        return new CameraKeyframe(new Vector3d(k.x(), k.y(), k.z()), (float) k.yaw(), (float) k.pitch(), 0f, InterpolationType.SMOOTH);
+        return new CameraKeyframe(new Vector3d(k.x(), k.keyframeY(), k.z()), (float) k.yaw(), (float) k.pitch(), 0f, InterpolationType.SMOOTH);
     }
 
     @Override
@@ -164,7 +164,7 @@ public final class LiveReplayDriver implements ReplayDriver {
         Handle h = (Handle) handle;
         KeyframeChange c = h.track().createKeyframeChange(tick, null);
         if (c instanceof KeyframeChangeCameraPosition p) {
-            return new double[] {p.position().x, p.position().y, p.position().z, p.yaw(), p.pitch()};
+            return new double[] {p.position().x, CameraKey.eyeY(p.position().y), p.position().z, p.yaw(), p.pitch()};
         }
         return Framing.cameraAt(h.clip(), tick);
     }

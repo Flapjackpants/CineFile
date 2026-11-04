@@ -77,6 +77,14 @@ def test_merge_rejects_overlapping_clip(tmp_path: Path):
         merge_editor_state(base, [_clip(250, 450)], replay_path=tmp_path / "replay.zip", total_ticks=2000)
 
 
+def test_camera_keyframe_position_is_below_eye(tmp_path: Path):
+    state = build_editor_state([_clip(100, 300)], replay_path=tmp_path / "replay.zip", total_ticks=2000)
+    scene = state["scenes"][state.get("sceneIndex", 0)]
+    track = next(t for t in scene["keyframeTracks"] if t["keyframeType"] == "CAMERA")
+    assert track["keyframesByTick"]["100"]["position"] == [0.0, pytest.approx(62.38), 0.0]
+    assert track["keyframesByTick"]["300"]["position"] == [1.0, pytest.approx(62.38), 1.0]
+
+
 def test_load_existing_state_refuses_corrupt_file(tmp_path: Path):
     states = tmp_path / "editor_states"
     states.mkdir()
