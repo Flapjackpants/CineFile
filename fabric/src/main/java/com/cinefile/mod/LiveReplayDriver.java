@@ -40,6 +40,7 @@ public final class LiveReplayDriver implements ReplayDriver {
     private record Handle(KeyframeTrack track, CameraClip clip) {}
 
     private static final int MAX_SHOT_WIDTH = 512;
+    private static final double CAMERA_MARGIN = 0.2;
 
     private final EditorState state;
     private final ReplayServer server;
@@ -103,8 +104,18 @@ public final class LiveReplayDriver implements ReplayDriver {
         return level.clip(cc).getType() != HitResult.Type.MISS;
     }
 
+    @Override
+    public boolean clips(double[] from, double[] to) {
+        ClientLevel level = Minecraft.getInstance().level;
+        AABB box = new AABB(to[0], to[1], to[2], to[0], to[1], to[2]).inflate(CAMERA_MARGIN);
+        if (!level.noBlockCollision(null, box)) return true;
+        ClipContext cc = new ClipContext(new Vec3(from[0], from[1], from[2]), new Vec3(to[0], to[1], to[2]),
+            ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, CollisionContext.empty());
+        return level.clip(cc).getType() != HitResult.Type.MISS;
+    }
+
     private static Keyframe key(CameraKey k) {
-        return new CameraKeyframe(new Vector3d(k.x(), k.y(), k.z()), (float) k.yaw(), (float) k.pitch(), 0f, InterpolationType.SMOOTH);
+        return new CameraKeyframe(new Vector3d(k.x(), k.keyframeY(), k.z()), (float) k.yaw(), (float) k.pitch(), 0f, InterpolationType.SMOOTH);
     }
 
     @Override
@@ -153,6 +164,11 @@ public final class LiveReplayDriver implements ReplayDriver {
                     new EditorSceneHistoryAction.SetKeyframe(type, index, clip.b().tick(), h.track().keyframesByTick.get(clip.b().tick()))),
                 "Add CineFile clip"));
             scene.keyframeTracks.get(index).customName = "CineFile: " + clip.styleId();
+            if (cfg.plainCameraTracks) {
+                for (KeyframeTrack t : scene.keyframeTracks) {
+                    if (t.customName != null && t.customName.startsWith("CineFile: ")) t.customName = null;
+                }
+            }
             state.markDirty();
         } finally {
             state.release(stamp);
@@ -164,7 +180,7 @@ public final class LiveReplayDriver implements ReplayDriver {
         Handle h = (Handle) handle;
         KeyframeChange c = h.track().createKeyframeChange(tick, null);
         if (c instanceof KeyframeChangeCameraPosition p) {
-            return new double[] {p.position().x, p.position().y, p.position().z, p.yaw(), p.pitch()};
+            return new double[] {p.position().x, CameraKey.eyeY(p.position().y), p.position().z, p.yaw(), p.pitch()};
         }
         return Framing.cameraAt(h.clip(), tick);
     }

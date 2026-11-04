@@ -12,6 +12,10 @@ from .camera import CameraClip
 from .settings import normalize_output_flashback_folder
 
 
+# Flashback treats keyframe Y as the player's feet and adds eye height when rendering.
+EYE_HEIGHT = 1.62
+
+
 DEFAULT_VISUALS: Dict[str, Any] = {
     "showChat": False,
     "showBossBar": False,
@@ -53,7 +57,7 @@ DEFAULT_VISUALS: Dict[str, Any] = {
 
 def _camera_kf(kf) -> Dict[str, Any]:
     return {
-        "position": [kf.x, kf.y, kf.z],
+        "position": [kf.x, kf.y - EYE_HEIGHT, kf.z],
         "yaw": kf.yaw,
         "pitch": kf.pitch,
         "roll": kf.roll,

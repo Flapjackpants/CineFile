@@ -53,7 +53,7 @@ public final class ClipVerifier {
         }
         double[] c = d.cameraAt(handle, tick);
         double[] pos = {c[0], c[1], c[2]};
-        if (cfg.rejectBlockClipping && (!d.isLoaded(pos) || d.blocked(i == 0 ? pos : prev, pos))) return Verdict.BLOCK_CLIP;
+        if (cfg.rejectBlockClipping && (!d.isLoaded(pos) || d.clips(i == 0 ? pos : prev, pos))) return Verdict.BLOCK_CLIP;
         prev = pos;
         if (cfg.rejectBlockedView) {
             Pose p = t.sample(tick);

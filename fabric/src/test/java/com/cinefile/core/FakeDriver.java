@@ -13,6 +13,7 @@ final class FakeDriver implements ReplayDriver {
     double fov = 70;
     boolean neverAtTick;
     BiPredicate<double[], double[]> blocked = (a, b) -> false;
+    BiPredicate<double[], double[]> clips = (a, b) -> blocked.test(a, b);
     Predicate<double[]> loaded = p -> true;
     Function<Integer, String> dim = t -> "overworld";
     Function<Integer, byte[]> png = n -> new byte[] {1};
@@ -35,6 +36,7 @@ final class FakeDriver implements ReplayDriver {
     public double fovDegrees() { return fov; }
     public boolean isLoaded(double[] pos) { return loaded.test(pos); }
     public boolean blocked(double[] from, double[] to) { return blocked.test(from, to); }
+    public boolean clips(double[] from, double[] to) { return clips.test(from, to); }
 
     public Object showCandidate(CameraClip clip) {
         shown.add(clip);
