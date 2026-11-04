@@ -11,6 +11,7 @@ public interface ReplayDriver {
     double fovDegrees(); // vertical FOV the replay renders with
     boolean isLoaded(double[] pos);           // {x,y,z}
     boolean blocked(double[] from, double[] to); // true if a block is hit along the segment, or `from` is inside one
+    boolean clips(double[] from, double[] to); // true if a box around `to` overlaps a block's collision shape, or a block's collision shape is hit along the segment
     Object showCandidate(CameraClip clip);    // tentative track: the screen follows it, not undoable
     void discardCandidate(Object handle);
     void commitCandidate(Object handle, CameraClip clip); // permanent, one undo entry

@@ -40,6 +40,7 @@ public final class LiveReplayDriver implements ReplayDriver {
     private record Handle(KeyframeTrack track, CameraClip clip) {}
 
     private static final int MAX_SHOT_WIDTH = 512;
+    private static final double CAMERA_MARGIN = 0.2;
 
     private final EditorState state;
     private final ReplayServer server;
@@ -100,6 +101,16 @@ public final class LiveReplayDriver implements ReplayDriver {
         }
         ClipContext cc = new ClipContext(new Vec3(from[0], from[1], from[2]), new Vec3(to[0], to[1], to[2]),
             ClipContext.Block.VISUAL, ClipContext.Fluid.NONE, CollisionContext.empty());
+        return level.clip(cc).getType() != HitResult.Type.MISS;
+    }
+
+    @Override
+    public boolean clips(double[] from, double[] to) {
+        ClientLevel level = Minecraft.getInstance().level;
+        AABB box = new AABB(to[0], to[1], to[2], to[0], to[1], to[2]).inflate(CAMERA_MARGIN);
+        if (!level.noBlockCollision(null, box)) return true;
+        ClipContext cc = new ClipContext(new Vec3(from[0], from[1], from[2]), new Vec3(to[0], to[1], to[2]),
+            ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, CollisionContext.empty());
         return level.clip(cc).getType() != HitResult.Type.MISS;
     }
 

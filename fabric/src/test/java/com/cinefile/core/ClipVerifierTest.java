@@ -2,6 +2,7 @@ package com.cinefile.core;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -63,6 +64,60 @@ class ClipVerifierTest {
         CineFileConfig off = cfg(30);
         off.rejectBlockClipping = false;
         assertEquals(Verdict.OK, run(t, c, off, d));
+    }
+
+    @Test
+    void clipsRejectsWhenSightLineIsClear() throws Exception {
+        Trajectory t = traj(300);
+        CameraClip c = clip(t, 0, 90);
+        FakeDriver d = new FakeDriver();
+        d.blocked = (a, b) -> false;
+        d.clips = (a, b) -> d.cur == 60;
+        assertEquals(Verdict.BLOCK_CLIP, run(t, c, cfg(10), d));
+    }
+
+    @Test
+    void clipCheckCanBeDisabled() throws Exception {
+        Trajectory t = traj(300);
+        CameraClip c = clip(t, 0, 90);
+        FakeDriver d = new FakeDriver();
+        d.blocked = (a, b) -> false;
+        d.clips = (a, b) -> d.cur == 60;
+        CineFileConfig off = cfg(10);
+        off.rejectBlockClipping = false;
+        assertEquals(Verdict.OK, run(t, c, off, d));
+    }
+
+    @Test
+    void blockedOnlyMeansBlockedViewNotClip() throws Exception {
+        Trajectory t = traj(300);
+        CameraClip c = clip(t, 0, 90);
+        FakeDriver d = new FakeDriver();
+        d.clips = (a, b) -> false;
+        d.blocked = (a, b) -> true;
+        assertEquals(Verdict.VIEW_BLOCKED, run(t, c, cfg(10), d));
+    }
+
+    @Test
+    void clipsGetsPreviousThenCurrentCameraPosition() throws Exception {
+        Trajectory t = traj(300);
+        CameraClip c = clip(t, 0, 90);
+        FakeDriver d = new FakeDriver();
+        d.blocked = (a, b) -> false;
+        List<double[]> froms = new ArrayList<>(), tos = new ArrayList<>();
+        d.clips = (a, b) -> {
+            froms.add(a.clone());
+            tos.add(b.clone());
+            return false;
+        };
+        assertEquals(Verdict.OK, run(t, c, cfg(10), d));
+        assertEquals(10, froms.size()); // ticks 0, 10, ..., 90
+        assertArrayEquals(tos.get(0), froms.get(0));
+        for (int i = 1; i < tos.size(); i++) assertArrayEquals(tos.get(i - 1), froms.get(i));
+        for (int i = 0; i < tos.size(); i++) {
+            double[] cam = d.cameraAt(c, i * 10);
+            assertArrayEquals(new double[] {cam[0], cam[1], cam[2]}, tos.get(i));
+        }
     }
 
     @Test

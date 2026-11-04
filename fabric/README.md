@@ -31,7 +31,7 @@ The camera path is checked in the real world at that moment in the replay.
 |---------|---------|
 | Reject cuts | Drops clips where the player teleports. |
 | Reject dimension changes | Drops clips where the player changes dimension. |
-| Reject camera through blocks | Drops clips where the camera passes through blocks. Also rejects unloaded chunks, since they can't be checked. |
+| Reject camera through blocks | Drops clips where the camera passes through blocks, sits in glass, or comes within 0.2 blocks of a solid surface. Also rejects unloaded chunks, since they can't be checked. |
 | Reject blocked view | Drops clips where the player is hidden in more than a quarter of the checks. |
 | Reject player off screen | Drops clips where the player is off screen for more than a quarter of the checks. |
 | Teleport distance | How far the player must jump, in blocks, to count as a teleport. |
