@@ -164,6 +164,11 @@ public final class LiveReplayDriver implements ReplayDriver {
                     new EditorSceneHistoryAction.SetKeyframe(type, index, clip.b().tick(), h.track().keyframesByTick.get(clip.b().tick()))),
                 "Add CineFile clip"));
             scene.keyframeTracks.get(index).customName = "CineFile: " + clip.styleId();
+            if (cfg.plainCameraTracks) {
+                for (KeyframeTrack t : scene.keyframeTracks) {
+                    if (t.customName != null && t.customName.startsWith("CineFile: ")) t.customName = null;
+                }
+            }
             state.markDirty();
         } finally {
             state.release(stamp);

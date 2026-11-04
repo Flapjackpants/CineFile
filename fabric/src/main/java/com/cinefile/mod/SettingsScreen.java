@@ -88,6 +88,8 @@ public class SettingsScreen extends Screen {
         EditBox player = l.text("Focus player", c.focusPlayer, 64, v -> c.focusPlayer = v);
         player.setTooltip(Tooltip.create(Component.literal("A player's UUID, or auto for the most cinematic player in each shot")));
         l.number("Tries per clip", () -> c.tries, v -> c.tries = (int) Math.round(v));
+        l.toggle("Plain camera elements", c.plainCameraTracks, v -> c.plainCameraTracks = v,
+            "Name placed clips and earlier CineFile clips as normal Camera elements. Earlier clips convert the next time Auto Create places a clip");
 
         l.header("Clip checks");
         l.toggle("Reject cuts", c.rejectCuts, v -> c.rejectCuts = v, null);

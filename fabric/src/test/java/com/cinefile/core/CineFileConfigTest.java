@@ -42,6 +42,11 @@ class CineFileConfigTest {
     }
 
     @Test
+    void plainCameraTracksDefaultsOff() {
+        assertFalse(new CineFileConfig().plainCameraTracks);
+    }
+
+    @Test
     void focusPlayerNormalizesUuidOrAuto() {
         CineFileConfig c = new CineFileConfig();
         assertEquals("auto", c.focusPlayer);
@@ -66,7 +71,7 @@ class CineFileConfigTest {
         c.maxAiUsd = 1.5; c.clipLengthS = 20; c.durationS = 99; c.teleportBlocks = 30;
         c.think = true; c.visualReview = true;
         c.rejectCuts = false; c.rejectDimensionChanges = false; c.rejectBlockClipping = false; c.rejectBlockedView = false;
-        c.rejectOffscreenPlayer = false;
+        c.rejectOffscreenPlayer = false; c.plainCameraTracks = true;
         c.tries = 7; c.checkEveryTicks = 4; c.cutLengthTicks = 9; c.gapFill = CineFileConfig.GapFill.TIMELAPSE;
         Path p = dir.resolve("o.json");
         c.save(p);
@@ -83,6 +88,7 @@ class CineFileConfigTest {
         assertEquals(30, r.teleportBlocks);
         assertTrue(r.think && r.visualReview);
         assertFalse(r.rejectCuts || r.rejectDimensionChanges || r.rejectBlockClipping || r.rejectBlockedView || r.rejectOffscreenPlayer);
+        assertTrue(r.plainCameraTracks);
         assertEquals(7, r.tries);
         assertEquals(4, r.checkEveryTicks);
         assertEquals(9, r.cutLengthTicks);

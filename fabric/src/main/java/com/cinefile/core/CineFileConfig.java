@@ -20,6 +20,7 @@ public final class CineFileConfig {
     public boolean think = false, visualReview = false;
     public boolean rejectCuts = true, rejectDimensionChanges = true, rejectBlockClipping = true, rejectBlockedView = true;
     public boolean rejectOffscreenPlayer = true;
+    public boolean plainCameraTracks = false;
     public int tries = 5, checkEveryTicks = 10, cutLengthTicks = 0;
     public GapFill gapFill = GapFill.CUT;
     public FocusLevel focusLevel = FocusLevel.AUTO;
