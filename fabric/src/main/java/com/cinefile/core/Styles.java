@@ -6,13 +6,16 @@ import java.util.Random;
 /** Built-in style presets (values of cinefile/styles/*.yaml). */
 public final class Styles {
     public static final String AUTO = "auto";
+    public static final String STRAIGHT_DOLLY = "straight-dolly", TOP_DOWN = "top-down";
 
     private static final List<Style> ALL = List.of(
             new Style("hero-low", "Low camera looking up for scale on tall builds.", 7.5, -0.8, 2.0, 12.0, true, 0.0, 0.8, "auto"),
             new Style("high-crane", "Elevated overview of large projects.", 12.0, 6.0, 2.5, -25.0, true, 0.0, 1.2, "auto"),
             new Style("locked-dolly", "Ep34-style locked-yaw over-the-shoulder dolly with rule-of-thirds framing.", 6.0, 1.0, 1.8, 0.0, true, 0.0, 1.0, "auto"),
             new Style("orbit-reveal", "Gentle yaw arc across the two keyframes around the subject.", 8.0, 2.0, 0.5, -8.0, false, 35.0, 0.6, "auto"),
-            new Style("side-track", "Strong lateral thirds framing, parallel tracking.", 5.5, 1.2, 3.5, -2.0, true, 0.0, 1.0, "left"));
+            new Style("side-track", "Strong lateral thirds framing, parallel tracking.", 5.5, 1.2, 3.5, -2.0, true, 0.0, 1.0, "left"),
+            new Style(STRAIGHT_DOLLY, "Level straight-line move forward or back, with little side-to-side motion.", 6.0, 1.0, 1.8, 0.0, true, 0.0, 1.0, "auto"),
+            new Style(TOP_DOWN, "Looks straight down at the player while moving slightly up or down.", 0.0, 10.0, 0.0, 90.0, true, 0.0, 1.0, "auto"));
 
     private Styles() {}
 

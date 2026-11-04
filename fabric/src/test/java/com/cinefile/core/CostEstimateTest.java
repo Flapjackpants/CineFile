@@ -39,7 +39,7 @@ class CostEstimateTest {
         CostEstimate e = CostEstimate.of(cfg);
         assertEquals(0.0007428, e.reviewUsd(), 1e-10);
         assertEquals(0.0140928, e.typicalUsd(), 1e-10);
-        assertEquals(1.9022904, e.worstUsd(), 1e-6);
+        assertEquals(2.6629176, e.worstUsd(), 1e-6);
     }
 
     @Test

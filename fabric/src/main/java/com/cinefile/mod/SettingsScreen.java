@@ -27,7 +27,7 @@ import net.minecraft.util.FormattedCharSequence;
 public class SettingsScreen extends Screen {
     private static final int WIDGET_WIDTH = 150;
     private static final List<String> STYLES =
-        List.of("auto", "locked-dolly", "hero-low", "high-crane", "side-track", "orbit-reveal");
+        List.of("auto", "locked-dolly", "hero-low", "high-crane", "side-track", "orbit-reveal", "straight-dolly", "top-down");
 
     private final Screen parent;
     private final CineFileConfig config = CineFileClient.config();

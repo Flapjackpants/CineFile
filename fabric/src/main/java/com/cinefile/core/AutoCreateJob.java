@@ -176,15 +176,17 @@ public final class AutoCreateJob {
             for (Candidate c : Candidates.windows(subject, clipTicks, 500, cfg.rejectCuts, cfg.rejectDimensionChanges)) {
                 if (occ.stream().anyMatch(o -> overlaps(c.start(), c.end(), o[0], o[1]))) continue;
                 List<Variant> vs = new ArrayList<>();
+                Set<CameraClip> seen = new HashSet<>();
                 for (Style s : styles) {
                     for (int i = 0; i < perStyle; i++) {
                         for (FocusLevel level : cfg.focusLevel.candidates()) {
-                            CameraClip k = CameraSynth.synthesize(subject, c.start(), c.end(), Styles.variant(s, i, c.start()), 0, level, fov);
-                            if (k == null) continue;
-                            FramingStats fs = Framing.stats(subject, k, 20, fov);
-                            if (cfg.rejectOffscreenPlayer && fs.onscreenFrac() < 0.5) continue;
-                            double mult = Framing.multiplier(fs) * (0.3 + 0.7 * Framing.sizeScore(subject, k, 20, fov)) * level.weight();
-                            vs.add(new Variant(subject, k, mult));
+                            for (CameraClip k : CameraSynth.synthesizeAll(subject, c.start(), c.end(), Styles.variant(s, i, c.start()), 0, level, fov)) {
+                                if (!seen.add(k)) continue;
+                                FramingStats fs = Framing.stats(subject, k, 20, fov);
+                                if (cfg.rejectOffscreenPlayer && fs.onscreenFrac() < 0.5) continue;
+                                double mult = Framing.multiplier(fs) * (0.3 + 0.7 * Framing.sizeScore(subject, k, 20, fov)) * level.weight();
+                                vs.add(new Variant(subject, k, mult));
+                            }
                         }
                     }
                 }

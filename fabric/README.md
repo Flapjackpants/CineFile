@@ -71,7 +71,7 @@ Open settings through Mod Menu.
 | Project | Your project description, sent to the API. |
 | Clip length | Target length of each clip. |
 | Total duration | Target length of the whole scene. |
-| Style | Shot style. `auto` by default. |
+| Style | Shot style. `auto` by default. `straight-dolly` moves level and straight, forward or back, trying both. `top-down` looks straight down and moves slightly up or down, trying both; focus levels don't change it. |
 | Focus level | `Auto` tries player center, eye level, high angle, and low angle, then keeps the best shot that passes checks. You can also fix one of those levels or choose the style preset. |
 | Focus player | `auto` compares every player the recording saw, shot by shot. A player can only be filmed while they were near the recording player. Enter a UUID to follow one player; a UUID absent from the replay stops the run with an error. |
 | Tries per clip | How many candidates to try per clip. 5 by default; Auto also tries each candidate at every focus level. |

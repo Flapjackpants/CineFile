@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -320,6 +321,31 @@ class AutoCreateJobTest {
         run(d, traj(1000), c, null);
         assertFalse(d.committed.isEmpty());
         for (CameraClip k : d.committed) assertEquals("locked-dolly", k.styleId());
+    }
+
+    @Test
+    void straightDollyCommitsLevelClips() throws Exception {
+        CineFileConfig c = walkConfig(FocusLevel.CENTER);
+        c.styleId = "straight-dolly";
+        FakeDriver d = new FakeDriver();
+        run(d, walk(), c, null);
+        assertFalse(d.committed.isEmpty());
+        for (CameraClip k : d.committed) {
+            assertEquals("straight-dolly", k.styleId());
+            assertEquals(k.a().y(), k.b().y(), 1e-9);
+        }
+    }
+
+    @Test
+    void topDownDoesNotRepeatClipsAcrossFocusLevels() throws Exception {
+        CineFileConfig c = cfg(10);
+        c.styleId = "top-down";
+        c.focusLevel = FocusLevel.AUTO;
+        FakeDriver d = new FakeDriver();
+        d.clips = (a, b) -> true;
+        run(d, walk(), c, null);
+        assertFalse(d.shown.isEmpty());
+        assertEquals(d.shown.size(), new HashSet<>(d.shown).size());
     }
 
     @Test

@@ -126,6 +126,13 @@ class CineFileConfigTest {
     }
 
     @Test
+    void newStylesSurviveSanitizing() throws Exception {
+        for (String id : new String[] {"straight-dolly", "top-down"}) {
+            assertEquals(id, CineFileConfig.load(write("{\"styleId\":\"" + id + "\"}")).styleId);
+        }
+    }
+
+    @Test
     void invalidFocusLevelBecomesAuto() throws Exception {
         assertEquals(FocusLevel.AUTO, CineFileConfig.load(write("{\"focusLevel\":\"x\"}")).focusLevel);
         assertEquals(FocusLevel.AUTO, CineFileConfig.load(write("{\"focusLevel\":null}")).focusLevel);
