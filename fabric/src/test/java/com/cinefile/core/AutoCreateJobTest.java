@@ -336,6 +336,91 @@ class AutoCreateJobTest {
         }
     }
 
+    private static CameraClip latest(FakeDriver d) {
+        return d.shown.get(d.shown.size() - 1);
+    }
+
+    @Test
+    void straightDollyShortensBlockedMoveAndCommits() throws Exception {
+        CineFileConfig c = walkConfig(FocusLevel.CENTER);
+        c.styleId = "straight-dolly";
+        FakeDriver d = new FakeDriver();
+        d.clips = (from, to) -> {
+            CameraClip k = d.shown.get(0);
+            double len = Math.hypot(k.b().x() - k.a().x(), k.b().z() - k.a().z());
+            return Math.hypot(to[0] - k.a().x(), to[2] - k.a().z()) > 0.6 * len; // 60% of 2 blocks is 1.2
+        };
+        AutoCreateJob.Result r = run(d, walk(), c, null).result();
+        assertEquals(2, d.shown.size());
+        assertEquals(d.shown.get(0).a(), d.shown.get(1).a());
+        CameraClip first = d.shown.get(0), second = d.shown.get(1);
+        double ax = second.b().x() - second.a().x(), az = second.b().z() - second.a().z();
+        double bx = first.b().x() - first.a().x(), bz = first.b().z() - first.a().z();
+        assertEquals(0, ax * bz - az * bx, 1e-6);
+        assertTrue(Math.hypot(ax, az) < Math.hypot(bx, bz));
+        assertEquals(first.b().yaw(), second.b().yaw());
+        assertEquals(first.b().pitch(), second.b().pitch());
+        assertTrue(d.discarded.contains(first));
+        assertTrue(d.committed.contains(second));
+        assertFalse(r.rejected().containsKey(Verdict.BLOCK_CLIP));
+        assertEquals(d.shown.size(), d.discarded.size() + d.committed.size());
+    }
+
+    @Test
+    void straightDollyFallsBackWhenFirstSampleClips() throws Exception {
+        CineFileConfig c = walkConfig(FocusLevel.CENTER);
+        c.styleId = "straight-dolly";
+        FakeDriver d = new FakeDriver();
+        d.clips = (from, to) -> true;
+        AutoCreateJob.Result r = run(d, walk(), c, null).result();
+        int rejected = r.rejected().getOrDefault(Verdict.BLOCK_CLIP, 0);
+        assertEquals(rejected, d.shown.size());
+        assertTrue(rejected > 0);
+        assertTrue(d.committed.isEmpty());
+    }
+
+    @Test
+    void straightDollyFallsBackWhenUnderOneBlockRemains() throws Exception {
+        CineFileConfig c = walkConfig(FocusLevel.CENTER);
+        c.styleId = "straight-dolly";
+        FakeDriver d = new FakeDriver();
+        d.clips = (from, to) -> Math.hypot(to[0] - latest(d).a().x(), to[2] - latest(d).a().z()) > 0.5;
+        AutoCreateJob.Result r = run(d, walk(), c, null).result();
+        int rejected = r.rejected().getOrDefault(Verdict.BLOCK_CLIP, 0);
+        assertEquals(rejected, d.shown.size());
+        assertTrue(rejected > 0);
+        assertTrue(d.committed.isEmpty());
+    }
+
+    @Test
+    void straightDollyStopsShorteningAtTheLimit() throws Exception {
+        CineFileConfig c = walkConfig(FocusLevel.CENTER);
+        c.styleId = "straight-dolly";
+        FakeDriver d = new FakeDriver();
+        d.clips = (from, to) -> Math.abs(to[0] - latest(d).b().x()) < 1e-9
+                && Math.abs(to[2] - latest(d).b().z()) < 1e-9;
+        AutoCreateJob.Result r = run(d, walk(), c, null).result();
+        int rejected = r.rejected().getOrDefault(Verdict.BLOCK_CLIP, 0);
+        assertTrue(rejected > 0);
+        assertEquals((AutoCreateJob.MAX_SHORTENS + 1) * rejected, d.shown.size());
+        assertTrue(d.committed.isEmpty());
+        assertEquals(d.shown.size(), d.discarded.size() + d.committed.size());
+    }
+
+    @Test
+    void otherStylesRejectBlockedMoveImmediately() throws Exception {
+        CineFileConfig c = walkConfig(FocusLevel.CENTER);
+        c.styleId = "locked-dolly";
+        FakeDriver d = new FakeDriver();
+        d.clips = (from, to) -> Math.abs(to[0] - latest(d).b().x()) < 1e-9
+                && Math.abs(to[2] - latest(d).b().z()) < 1e-9;
+        AutoCreateJob.Result r = run(d, walk(), c, null).result();
+        int rejected = r.rejected().getOrDefault(Verdict.BLOCK_CLIP, 0);
+        assertTrue(rejected > 0);
+        assertEquals(rejected, d.shown.size());
+        assertTrue(d.committed.isEmpty());
+    }
+
     @Test
     void topDownDoesNotRepeatClipsAcrossFocusLevels() throws Exception {
         CineFileConfig c = cfg(10);

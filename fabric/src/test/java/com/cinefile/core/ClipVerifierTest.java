@@ -22,14 +22,17 @@ class ClipVerifierTest {
         return c;
     }
 
-    static Verdict run(Trajectory t, CameraClip clip, CineFileConfig c, FakeDriver d) {
-        ClipVerifier v = new ClipVerifier(t, clip, clip, c);
+    static Verdict drive(ClipVerifier v, FakeDriver d) {
         for (int i = 0; i < 5000; i++) {
             Verdict r = v.step(d);
             if (r != null) return r;
         }
         fail("never finished");
         return null;
+    }
+
+    static Verdict run(Trajectory t, CameraClip clip, CineFileConfig c, FakeDriver d) {
+        return drive(new ClipVerifier(t, clip, clip, c), d);
     }
 
     @Test
@@ -118,6 +121,25 @@ class ClipVerifierTest {
             double[] cam = d.cameraAt(c, i * 10);
             assertArrayEquals(new double[] {cam[0], cam[1], cam[2]}, tos.get(i));
         }
+    }
+
+    @Test
+    void lastSafeTracksPassedSamples() throws Exception {
+        Trajectory t = traj(300);
+        CameraClip c = clip(t, 0, 90);
+        CineFileConfig cf = cfg(30);
+        FakeDriver first = new FakeDriver();
+        first.clips = (a, b) -> first.cur == 0;
+        ClipVerifier v0 = new ClipVerifier(t, c, c, cf);
+        assertEquals(Verdict.BLOCK_CLIP, drive(v0, first));
+        assertNull(v0.lastSafe());
+
+        FakeDriver later = new FakeDriver();
+        later.clips = (a, b) -> later.cur == 60;
+        ClipVerifier v1 = new ClipVerifier(t, c, c, cf);
+        assertEquals(Verdict.BLOCK_CLIP, drive(v1, later));
+        double[] prior = later.cameraAt(c, 30);
+        assertArrayEquals(new double[] {prior[0], prior[1], prior[2]}, v1.lastSafe(), 1e-12);
     }
 
     @Test
