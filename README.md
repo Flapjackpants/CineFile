@@ -1,152 +1,103 @@
 # CineFile
 
-Python CLI that automates [Flashback](https://modrinth.com/mod/flashback/) cinematic camera keyframes from a replay zip.
+A client-side Fabric mod that picks cinematic camera shots from a [Flashback](https://modrinth.com/mod/flashback/) recording and adds them to the timeline while you watch.
 
-## Install
+The mod source, Gradle build, and Java tests live in [`fabric/`](fabric/).
+
+## Requirements
+
+- Minecraft 26.3
+- Java 25
+- Fabric Loader 0.19.5 or newer
+- Fabric API
+- Flashback 0.43.6 or newer 0.43.x
+- Mod Menu
+
+## Build and install
+
+With Java 25 installed, run from the repository root:
 
 ```bash
-cd CineFile
-python3 -m pip install -e .
+cd fabric
+./gradlew build
 ```
 
-## Minecraft mod
+On Windows, use `gradlew.bat build`. The build runs the Java tests and produces the mod jar in `fabric/build/libs/` (relative to the repository root). Copy `cinefile-<version>.jar`, not the `-sources.jar`, to your Minecraft instance's `mods/` folder alongside Fabric API, Flashback, and Mod Menu. Launch the instance with Fabric Loader.
 
-`fabric/` holds a Fabric mod for Minecraft 26.3 that does this inside Flashback, on your real screen, with a button in the top row. See [fabric/README.md](fabric/README.md).
+Flashback is downloaded as a build dependency; it isn't bundled in the mod jar.
 
-## Usage
+To run just the tests from `fabric/`, use `./gradlew test`. The optional real-replay test requires `CINEFILE_TEST_REPLAY` (the replay zip path) and `CINEFILE_TEST_EXPECT` (comma-separated pose count, cut count, and total ticks); it is skipped when those variables are unset.
 
-### Interactive menu
+## Use
 
-```bash
-cinefile
-```
+Open a replay in Flashback and click **Auto Create** in the top row. A dialog shows the clip count, estimated cost, and a budget for this run. Click **Start** to begin. Clips appear as they are verified. The button shows `Cancel (placed/target)` while it runs. The budget starts at **Max spend** and does not change that setting.
 
-Opens the terminal UI.
+Existing tracks are kept, and only empty time is used. Each placed clip can be undone on its own.
 
-**Menu keys**
+## What each clip is checked for
 
-- `↑`/`↓` select a replay.
-- `Enter` or `r` generate editor states for the selected replay, using your saved settings.
-- `s` open Settings.
-- `q` quit.
-- On the result screen, `Enter` or `Escape` goes back to the menu.
-- While a run is in progress, the result screen shows a live ASCII view of the camera being scored.
-
-**Editing settings**
-
-Settings are edited as JSON in a vim-like buffer:
-
-- `i` enters insert mode. `Escape` returns to normal mode.
-- `h`/`j`/`k`/`l` or the arrow keys move the cursor.
-- `:w` saves and stays. `:wq` saves and returns. `:q` returns without saving.
-
-Settings are saved to `~/.config/cinefile/settings.json` (or `$XDG_CONFIG_HOME/cinefile/settings.json`).
-
-### Settings
+The camera path is checked in the real world at that moment in the replay.
 
 | Setting | Meaning |
 |---------|---------|
-| `input_flashback_folder` | The Flashback folder that holds the replay files (`.zip`) you want to edit. CineFile lists the replays it finds here. You can give the `flashback/` folder or its `replays/` subfolder. |
-| `output_flashback_folder` | The Flashback folder of the Minecraft instance where the editor states are written (`flashback/editor_states/`). You can give the instance root, its `flashback/` folder, or `flashback/editor_states/`. |
-| `clip_length_s` | Seconds per shot. |
-| `style_id` | Camera style. See [Styles](#styles). |
-| `duration_s` | Target total length of the cinematic, in seconds. |
-| `project` | Optional description that helps CineFile pick representative clips. |
-| `timelapse` | Fill gaps between clips with timelapse tracks. |
-| `offline` | Skip DeepSeek and use heuristic-only selection. |
-| `max_ai_usd` | Maximum DeepSeek spend per run, in USD. |
-| `think` | Allow higher DeepSeek reasoning effort (costs more). |
-| `dry_run` | Write `*.json.dry_run` files instead of changing the editor state. |
-| `visual_review` | Render preview images of the top clips and let DeepSeek score them. Needs `DEEPSEEK_API_KEY`. |
-| `tries` | Camera variants scored per clip; the best-framed one is kept. With `style_id: auto`, each style gets about `tries ÷ number of styles` variants (at least 1). Higher is slower. |
+| Reject cuts | Drops clips where the player teleports. |
+| Reject dimension changes | Drops clips where the player changes dimension. |
+| Reject camera through blocks | Drops clips where the camera passes through blocks, sits in glass, or comes within 0.2 blocks of a solid surface. Also rejects unloaded chunks, since they can't be checked. `straight-dolly` first shortens its move along the same line, and only tries another shot if it would move under 1 block. |
+| Reject blocked view | Drops clips where the player is hidden in more than a quarter of the checks. |
+| Reject player off screen | Drops clips where the player is off screen for more than a quarter of the checks. |
+| Teleport distance | How far the player must jump, in blocks, to count as a teleport. |
+| Check every N ticks | How often the camera path is sampled. |
 
-Clips whose camera passes through blocks, or whose view of the player is blocked, are scored lower when the replay contains chunk caches.
+## Other tools
 
-Clips are spread across the whole replay, including every recording in a joined replay: CineFile picks the best clip from each equal time slice, skips idle slices and uses the next-best clips instead.
+- **Cut** opens a menu with **Remove all cuts** and **Reset cuts**. Each asks first. Reset removes all cuts and adds one in each gap of 5+ ticks between camera tracks, using the current cut length. Each action is one undo step. Undo restores cuts but not their names, matching Delete All's limit.
+- To add a cut, click **Add Element** in the timeline, then **Cut**. It runs from the playhead to 5 seconds later. Drag its keyframes to change the range.
+- **Delete All** asks first, then removes every track from the current scene and clears the export range. Undo restores the tracks, but not the range or custom track names.
+- Scrolling: the wheel scrolls tracks, Ctrl+wheel zooms, and Shift+wheel pans.
 
-Both paths accept a string or `null`. Other settings use the same defaults as the CLI. Older settings files still work: legacy `input_path`, `render_instance_path` and `output_path` keys are migrated to the new names.
+## Cuts and short timelapses
 
-### Input and output folders
+Cut length 0 removes all frames between the two keyframes. Cut length 1 or more plays a normal timelapse of that length.
 
-CineFile reads replays from one Flashback folder and writes editor states into another:
+Sounds inside a cut are dropped in preview and export, including sounds from note blocks, pistons, and other block and entity events. Particles are cleared when a cut ends, including any from before it. A jukebox song that starts inside a cut starts when the cut ends, at the position it would have reached. A song already playing when a cut starts keeps its position, so it is out of sync after the cut.
 
-- **Input Flashback folder (`input_flashback_folder`)**: the Flashback folder where your replay files are. CineFile only reads from it.
-- **Output Flashback folder (`output_flashback_folder`)**: the Flashback folder of the instance you render in. CineFile writes editor states to its `flashback/editor_states/`.
+Short timelapses leave stray frames from the middle of the skipped range. Measured on Flashback 0.43.6's export code for a 1-tick timelapse: 1 frame at 24 or 30 fps, 2-3 at 60, and 5-6 at 120.
 
-Use one render instance for all your renders, so mods and texture packs stay the same for every recording. Copy the replay zip into that instance's `flashback/replays/` so Flashback can open it there.
+Cuts are saved as timelapse tracks, so the replay still opens without this mod. A length-0 cut then plays as a 1-tick timelapse. Export still simulates the ticks inside a cut, so very long cuts export more slowly.
 
-After a run, **close and reopen** the replay in Flashback. Flashback then reloads `editor_states/{uuid}.json`.
+A timelapse also changes how Flashback times later camera moves: its speed carries on after the track ends, until the next speed change. Very fast timelapses can make later cameras stutter. Length 0 cuts are not affected.
 
-### Existing editor states
+## Settings and API keys
 
-If an editor state already exists for the replay, CineFile does not overwrite or remove any of its keyframes:
+Open settings through Mod Menu.
 
-- It keeps every existing track.
-- It adds new camera clips only in tick ranges that have no keyframes.
-- It adds timelapse gaps only where they do not cross existing keyframes.
-- It backs up the previous file to `editor_backups/`.
-- If no empty space is left, the run fails and nothing is written.
+| Setting | Meaning |
+|---------|---------|
+| API key | Key for your AI provider. Leave blank to use heuristics only. |
+| Base URL | Any OpenAI-compatible API. DeepSeek by default. |
+| Model | Model name sent to the API. |
+| Max spend | Default budget for each run, estimated at DeepSeek prices. |
+| Think harder | Lets the model use its default reasoning effort instead of low, which costs more. |
+| Screenshot review | Sends screenshots to the model for review. Off by default. |
+| Project | Your project description, sent to the API. |
+| Clip length | Target length of each clip. |
+| Total duration | Target length of the whole scene. |
+| Style | Shot style. `auto` by default. `straight-dolly` moves level and straight, forward or back, trying both. `top-down` looks straight down and moves slightly up or down, trying both; focus levels don't change it. |
+| Focus level | `Auto` tries player center, eye level, high angle, and low angle, then keeps the best shot that passes checks. You can also fix one of those levels or choose the style preset. |
+| Focus player | `auto` compares every player the recording saw, shot by shot. A player can only be filmed while they were near the recording player. Enter a UUID to follow one player; a UUID absent from the replay stops the run with an error. |
+| Tries per clip | How many candidates to try per clip. 5 by default; Auto also tries each candidate at every focus level. |
+| Plain camera elements | Off by default. When Auto Create places a clip, removes the `CineFile: ` name from that clip and earlier CineFile clips in the scene, so they show as normal Camera elements. Each clip stays its own track. |
+| Fill gaps with | What goes between placed clips: a cut, a 1-second timelapse, or nothing. |
+| Cut length | Length in ticks of newly made cuts. See above. |
 
-### Command-line flags (scripting)
+Leaving the key blank uses heuristics only.
 
-```bash
-cinefile \
-  --replay "/path/to/flashback/replays/2026-09-15T21_38_50.zip" \
-  --clip-length 10 \
-  --style locked-dolly \
-  --duration 180 \
-  --project "building town hall" \
-  --timelapse \
-  --offline
-```
+Camera distance, side offset, and orbit adjust to the replay's FOV, using 53 degrees as the reference. The replay uses Flashback's FOV override when enabled, or the game's FOV otherwise.
 
-Command-line flags override the saved settings.
+## Privacy
 
-- `--no-view`: the live ASCII view of the camera being scored is drawn on stderr only when stderr is a terminal; `--no-view` turns it off.
+The key is stored in plain text in `config/cinefile.json`, owner-only where the OS allows.
 
-If you omit `--editor-dir`, CineFile uses the saved `output_flashback_folder`. If that is not set, it infers the editor folder from the replay path.
+Plain `http://` is refused except for localhost.
 
-To start the menu with paths already filled in, use `-i/--input-flashback-folder` (alias `--input`) for the input Flashback folder and `-o/--output-flashback-folder` (aliases `--output`, `--render-instance`) for the output Flashback folder. This opens Settings.
-
-### Styles
-
-```bash
-cinefile --list-styles
-```
-
-- `locked-dolly` — ep34-style locked yaw OTS (default)
-- `hero-low` — low angle looking up
-- `high-crane` — elevated overview
-- `side-track` — strong lateral tracking
-- `orbit-reveal` — gentle yaw arc across the shot
-- `straight-dolly` — level straight move forward or back; tries both
-- `top-down` — looks straight down, moving slightly up or down; tries both
-- `auto` — builds every style per clip and keeps the best-framed one
-
-### AI (optional)
-
-Candidate windows are re-scored locally with [laya-mlx](https://huggingface.co/aac6fef/laya-mlx)
-(Apple silicon only, installed automatically there; the ~843 MB model downloads from Hugging Face on
-first run). Override the checkpoint with `LAYA_MODEL`. On other platforms this step falls back to
-heuristic scores.
-
-DeepSeek optionally picks the final clips. Without a key (or with `--offline`), selection is heuristic-only ($0).
-
-```bash
-export DEEPSEEK_API_KEY=...
-cinefile --replay ... --duration 180 --timelapse
-```
-
-Laya is free; `--max-ai-usd 0.05` caps DeepSeek spend (typically a few cents per run).
-
-## Flags
-
-| Flag | Meaning |
-|------|---------|
-| `--clip-length` | Seconds per shot |
-| `--duration` | Target total cinematic seconds |
-| `--timelapse` | Fill gaps with 1s (`0→20` tick) timelapse tracks |
-| `--editor-dir` | Instance root or `flashback/` folder (overrides the settings output Flashback folder) |
-| `--dry-run` | Write `*.json.dry_run` instead of replacing state |
-| `--visual-review` | Let DeepSeek score the top clips from rendered preview images |
-| `--tries` | Camera variants scored per clip (see `tries` setting) |
+Shot timings and your project description go to the API. Screenshots go only if Screenshot review is on, and it is off by default.
